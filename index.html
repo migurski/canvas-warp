@@ -1,0 +1,44 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Canvas Warp</title>
+    <style type="text/css" title="text/css">
+    <!--
+        body { background-color: silver; }
+        #c { border: 1px solid black; }
+    -->
+    </style>
+</head>
+<body>
+    <canvas id="c" width="650" height="400"></canvas>
+    <script type="text/javascript" language="javascript1.5">
+    <!--
+        
+        var img = new Image();
+
+        img.onload = function()
+        {
+            var c = document.getElementById('c').getContext('2d');
+            
+            for(i = 0; i < 4; i += 1)
+            {
+                c.save();
+                c.beginPath();
+                c.arc(150, 150, 120, 120, Math.PI*2, true);
+                c.closePath();
+                c.clip();
+                c.drawImage(this, 0, 0, this.width, this.height);
+                c.restore();
+    
+                c.translate(100, 0);
+            }
+        };
+
+        img.src = 'magical_forest.jpg';
+    
+    //-->
+    </script>
+</body>
+</html>
