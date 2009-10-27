@@ -18,22 +18,97 @@
         
         var img = new Image();
 
+       /** Solves a system of linear equations.
+        
+        t1 = (a * r1) + (b + s1) + c
+        t2 = (a * r2) + (b + s2) + c
+        t3 = (a * r3) + (b + s3) + c
+        
+        r1 - t3 are the known values.
+        a, b, c are the unknowns to be solved.
+        returns the a, b, c coefficients.
+        */
+        function linearSolution(r1, s1, t1, r2, s2, t2, r3, s3, t3)
+        {
+            // make them all floats
+            r1 = parseFloat(r1);
+            s1 = parseFloat(s1);
+            t1 = parseFloat(t1);
+            r2 = parseFloat(r2);
+            s2 = parseFloat(s2);
+            t2 = parseFloat(t2);
+            r3 = parseFloat(r3);
+            s3 = parseFloat(s3);
+            t3 = parseFloat(t3);
+            
+            var a = (((t2 - t3) * (s1 - s2)) - ((t1 - t2) * (s2 - s3))) / (((r2 - r3) * (s1 - s2)) - ((r1 - r2) * (s2 - s3)));
+            var b = (((t2 - t3) * (r1 - r2)) - ((t1 - t2) * (r2 - r3))) / (((s2 - s3) * (r1 - r2)) - ((s1 - s2) * (r2 - r3)));
+            var c = t1 - (r1 * a) - (s1 * b);
+            
+            return [a, b, c];
+        }
+        
         img.onload = function()
         {
             var c = document.getElementById('c').getContext('2d');
+            var w = document.getElementById('c').width;
+            var h = document.getElementById('c').height;
             
-            for(i = 0; i < 4; i += 1)
-            {
-                c.save();
-                c.beginPath();
-                c.arc(150, 150, 120, 120, Math.PI*2, true);
-                c.closePath();
-                c.clip();
-                c.drawImage(this, 0, 0, this.width, this.height);
-                c.restore();
-    
-                c.translate(100, 0);
-            }
+            var x1 = 25 + Math.round(Math.random() * (w - 50));
+            var y1 = 25 + Math.round(Math.random() * (h - 50));
+            var x2 = 25 + Math.round(Math.random() * (w - 50));
+            var y2 = 25 + Math.round(Math.random() * (h - 50));
+            var x3 = 25 + Math.round(Math.random() * (w - 50));
+            var y3 = 25 + Math.round(Math.random() * (h - 50));
+            
+            xm = linearSolution(0, 0, x1, this.width, 0, x2, 0, this.height, x3);
+            ym = linearSolution(0, 0, y1, this.width, 0, y2, 0, this.height, y3);
+            
+            /*
+            _x1 = xm[0] * 0 + xm[1] * 0 + xm[2];
+            _y1 = ym[0] * 0 + ym[1] * 0 + ym[2];
+            alert((x1 == _x1) && (y1 == _y1));
+            
+            _x2 = xm[0] * this.width + xm[1] * 0 + xm[2];
+            _y2 = ym[0] * this.width + ym[1] * 0 + ym[2];
+            alert((x2 == _x2) && (y2 == _y2));
+            
+            _x3 = xm[0] * 0 + xm[1] * this.height + xm[2];
+            _y3 = ym[0] * 0 + ym[1] * this.height + ym[2];
+            alert((x3 == _x3) && (y3 == _y3));
+            */
+            
+            c.save();
+            // another matrix argument order bug?
+            c.setTransform(xm[0], ym[0], xm[1], ym[1], xm[2], ym[2]);
+            c.beginPath();
+            c.moveTo(0, 0);
+            c.lineTo(this.width, 0);
+            c.lineTo(0, this.height);
+            c.lineTo(0, 0);
+            c.closePath();
+            c.fill();
+            c.clip();
+            c.drawImage(this, 0, 0, this.width, this.height);
+            c.restore();
+            
+            c.beginPath();
+            c.arc(x1, y1, 5, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = '#ff0000';
+            c.fill();
+
+            c.beginPath();
+            c.arc(x2, y2, 5, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = '#009900';
+            c.fill();
+
+            c.beginPath();
+            c.arc(x3, y3, 5, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = '#0000ff';
+            c.fill();
         };
 
         img.src = 'magical_forest.jpg';
