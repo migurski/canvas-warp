@@ -6,8 +6,8 @@
 	<title>Canvas Warp</title>
     <style type="text/css" title="text/css">
     <!--
-        body { background-color: silver; }
-        #c { border: 1px solid black; }
+        body { background-color: #bbb; }
+        #c { border: 1px solid black; background-color: #ccc; }
     -->
     </style>
 </head>
@@ -60,23 +60,14 @@
             var y2 = 25 + Math.round(Math.random() * (h - 50));
             var x3 = 25 + Math.round(Math.random() * (w - 50));
             var y3 = 25 + Math.round(Math.random() * (h - 50));
+            var x4 = 25 + Math.round(Math.random() * (w - 50));
+            var y4 = 25 + Math.round(Math.random() * (h - 50));
             
             xm = linearSolution(0, 0, x1, this.width, 0, x2, 0, this.height, x3);
             ym = linearSolution(0, 0, y1, this.width, 0, y2, 0, this.height, y3);
-            
-            /*
-            _x1 = xm[0] * 0 + xm[1] * 0 + xm[2];
-            _y1 = ym[0] * 0 + ym[1] * 0 + ym[2];
-            alert((x1 == _x1) && (y1 == _y1));
-            
-            _x2 = xm[0] * this.width + xm[1] * 0 + xm[2];
-            _y2 = ym[0] * this.width + ym[1] * 0 + ym[2];
-            alert((x2 == _x2) && (y2 == _y2));
-            
-            _x3 = xm[0] * 0 + xm[1] * this.height + xm[2];
-            _y3 = ym[0] * 0 + ym[1] * this.height + ym[2];
-            alert((x3 == _x3) && (y3 == _y3));
-            */
+
+            xn = linearSolution(this.width, this.height, x4, this.width, 0, x2, 0, this.height, x3);
+            yn = linearSolution(this.width, this.height, y4, this.width, 0, y2, 0, this.height, y3);
             
             c.save();
             // another matrix argument order bug?
@@ -86,6 +77,20 @@
             c.lineTo(this.width, 0);
             c.lineTo(0, this.height);
             c.lineTo(0, 0);
+            c.closePath();
+            c.fill();
+            c.clip();
+            c.drawImage(this, 0, 0, this.width, this.height);
+            c.restore();
+            
+            c.save();
+            // another matrix argument order bug?
+            c.setTransform(xn[0], yn[0], xn[1], yn[1], xn[2], yn[2]);
+            c.beginPath();
+            c.moveTo(this.width, this.height);
+            c.lineTo(this.width, 0);
+            c.lineTo(0, this.height);
+            c.lineTo(this.width, this.height);
             c.closePath();
             c.fill();
             c.clip();
@@ -108,6 +113,12 @@
             c.arc(x3, y3, 5, 0, Math.PI * 2, true);
             c.closePath();
             c.fillStyle = '#0000ff';
+            c.fill();
+
+            c.beginPath();
+            c.arc(x4, y4, 5, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = '#666666';
             c.fill();
         };
 
