@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Canvas Triangulate</title>
+    <style type="text/css" title="text/css">
+    <!--
+        body { background-color: #bbb; }
+        #c { border: 1px solid black; background-color: #ccc; }
+    -->
+    </style>
+</head>
+<body>
+    <canvas id="c" width="650" height="390"></canvas>
+    <script type="text/javascript" language="javascript1.5">
+    <!--
+        
+        var c = document.getElementById('c').getContext('2d');
+        var w = document.getElementById('c').width;
+        var h = document.getElementById('c').height;
+        
+        var points = [];
+        
+        for(var i = 0; i < 1; i += 1)
+        {
+            var x = 100 + Math.round(Math.random() * (w - 200));
+            var y = 100 + Math.round(Math.random() * (h - 200));
+            points.push([x, y]);
+            
+            c.beginPath();
+            c.arc(x, y, 5, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = '#666666';
+            c.fill();
+        }
+        
+        function circumcircle(p1, p2, p3)
+        {
+            var x1 = p1[0];
+            var y1 = p1[1];
+            var x2 = p2[0];
+            var y2 = p2[1];
+            var x3 = p3[0];
+            var y3 = p3[1];
+            
+            var sq = function(x) { return Math.pow(x, 2); };
+            
+            var d = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+            var x = ((sq(y1) + sq(x1)) * (y2 - y3) + (sq(y2) + sq(x2)) * (y3 - y1) + (sq(y3) + sq(x3)) * (y1 - y2)) / d;
+            var y = ((sq(y1) + sq(x1)) * (x3 - x2) + (sq(y2) + sq(x2)) * (x1 - x3) + (sq(y3) + sq(x3)) * (x2 - x1)) / d;
+
+            var r1 = Math.sqrt(sq(x1 - x) + sq(y1 - y));
+            var r2 = Math.sqrt(sq(x2 - x) + sq(y2 - y));
+            var r3 = Math.sqrt(sq(x3 - x) + sq(y3 - y));
+            
+            var r = (r1 + r2 + r3) / 3;
+            
+            return [x, y, r];
+        }
+        
+        function inCircle(point, circle)
+        {
+            var distance = Math.sqrt(Math.pow(point[0] - circle[0], 2), Math.pow(point[1] - circle[1], 2));
+            return distance <= circle[2];
+        }
+        
+        var supertriangle = [[-w/2, 0], [w*3/2, 0], [w/2, h*2]];
+        points.push(supertriangle[0]);
+        points.push(supertriangle[1]);
+        points.push(supertriangle[2]);
+        
+        var triangles = [supertriangle];
+        
+        var i = 0;
+        
+        var tri = triangles[i];
+        
+        var cc = circumcircle(tri[0], tri[1], tri[2]);
+        
+        var edges = [];
+        
+        if(inCircle(points[0], cc))
+        {
+            edges.push([tri[0], tri[1]]);
+            edges.push([tri[1], tri[2]]);
+            edges.push([tri[2], tri[0]]);
+            triangles.splice(i, 1);
+        }
+        
+        function edgesMatch(e1, e2)
+        {
+            return ((e1[0][0] == e2[0][0] && e1[1][0] == e2[1][0])
+                 || (e1[1][0] == e2[1][0] && e1[0][0] == e2[0][0]));
+        }
+        
+        for(var j = 0; j < edges.length; j += 1)
+        {
+            for(var k = j + 1; k < edges.length; k += 1)
+            {
+                if(edgesMatch(edges[j], edges[k]))
+                {
+                    edges.splice(j, 1);
+                    j -= 1;
+                    break;
+                }
+            }
+        }
+        
+        while(edges.length)
+        {
+            var e = edges.pop();
+            triangles.push([[x, y], e[0], e[1]]);
+        }
+        
+        function drawTriangle(c, p1, p2, p3)
+        {
+            c.beginPath();
+            c.moveTo(p1[0], p1[1]);
+            c.lineTo(p2[0], p2[1]);
+            c.lineTo(p3[0], p3[1]);
+            c.lineTo(p1[0], p1[1]);
+            c.closePath();
+            c.strokeStyle = '#ff0000';
+            c.stroke();
+        }
+        
+        for(var i = 0; i < triangles.length; i += 1)
+        {
+            var t = triangles[i];
+            alert(t);
+            drawTriangle(c, t[0], t[1], t[2]);
+        }
+    
+    //-->
+    </script>
+</body>
+</html>
