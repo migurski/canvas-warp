@@ -22,7 +22,7 @@
         
         var points = [];
         
-        for(var i = 0; i < 1; i += 1)
+        for(var i = 0; i < 2; i += 1)
         {
             var x = 100 + Math.round(Math.random() * (w - 200));
             var y = 100 + Math.round(Math.random() * (h - 200));
@@ -72,45 +72,68 @@
         
         var triangles = [supertriangle];
         
-        var i = 0;
-        
-        var tri = triangles[i];
-        
-        var cc = circumcircle(tri[0], tri[1], tri[2]);
-        
-        var edges = [];
-        
-        if(inCircle(points[0], cc))
+       /**
+        */
+        function addPoint(point, triangles)
         {
-            edges.push([tri[0], tri[1]]);
-            edges.push([tri[1], tri[2]]);
-            edges.push([tri[2], tri[0]]);
-            triangles.splice(i, 1);
+            var edges = [];
+            
+            for(var i = 0; i < triangles.length; i += 1)
+            {
+                var tri = triangles[i];
+                var cc = circumcircle(tri[0], tri[1], tri[2]);
+                if(inCircle(point, cc))
+                {
+                    edges.push([tri[0], tri[1]]);
+                    edges.push([tri[1], tri[2]]);
+                    edges.push([tri[2], tri[0]]);
+                    triangles.splice(i, 1);
+                    i -= 1;
+                }
+            }
+            
+            var allEdges = edges;
+            var uniqEdges = [];
+            
+            for(var i = 0; i < edges.length; i += 1)
+            {
+                var unique = true;
+                
+                for(var j = i + 1; j < edges.length; j += 1)
+                {
+                    if(edgesMatch(edges[i], edges[j]))
+                    {
+                        unique = false;
+                    }
+                }
+                
+                if(unique)
+                {
+                    uniqEdges.push(edges[i]);
+                }
+            }
+            
+            //alert(allEdges.length + ' vs ' + uniqEdges.length);
+            
+            edges = uniqEdges;
+            
+            while(edges.length)
+            {
+                var e = edges.pop();
+                var tri = [point, e[0], e[1]];
+                triangles.push(tri);
+            }
         }
         
         function edgesMatch(e1, e2)
         {
-            return ((e1[0][0] == e2[0][0] && e1[1][0] == e2[1][0])
-                 || (e1[1][0] == e2[1][0] && e1[0][0] == e2[0][0]));
-        }
-        
-        for(var j = 0; j < edges.length; j += 1)
-        {
-            for(var k = j + 1; k < edges.length; k += 1)
-            {
-                if(edgesMatch(edges[j], edges[k]))
-                {
-                    edges.splice(j, 1);
-                    j -= 1;
-                    break;
-                }
-            }
-        }
-        
-        while(edges.length)
-        {
-            var e = edges.pop();
-            triangles.push([[x, y], e[0], e[1]]);
+            var e1p1 = e1[0];
+            var e1p2 = e1[1];
+            var e2p1 = e2[0];
+            var e2p2 = e2[1];
+            
+            return ((e1p1[0] == e2p1[0] && e1p1[1] == e2p1[1]  &&  e1p2[0] == e2p2[0] && e1p2[1] == e2p2[1])
+                 || (e1p1[0] == e2p2[0] && e1p1[1] == e2p2[1]  &&  e1p2[0] == e2p1[0] && e1p2[1] == e2p1[1]));
         }
         
         function drawTriangle(c, p1, p2, p3)
@@ -125,10 +148,14 @@
             c.stroke();
         }
         
+        for(var i = 0; i < points.length - 3; i += 1)
+        {
+            addPoint(points[i], triangles);
+        }
+        
         for(var i = 0; i < triangles.length; i += 1)
         {
             var t = triangles[i];
-            alert(t);
             drawTriangle(c, t[0], t[1], t[2]);
         }
     
