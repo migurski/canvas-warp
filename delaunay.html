@@ -22,17 +22,18 @@
         
         var points = [];
         
-        for(var i = 0; i < 2; i += 1)
+        /*
+        points.push([w/4, 0]);
+        points.push([w * 3/4, 0]);
+        points.push([w/4, h/2]);
+        points.push([w * 3/4, h/2]);
+        */
+        
+        for(var i = 0; i < 15; i += 1)
         {
-            var x = 100 + Math.round(Math.random() * (w - 200));
-            var y = 100 + Math.round(Math.random() * (h - 200));
+            var x = Math.round(w/4 + Math.random() * w/2);
+            var y = Math.round(  0 + Math.random() * h/2);
             points.push([x, y]);
-            
-            c.beginPath();
-            c.arc(x, y, 5, 0, Math.PI * 2, true);
-            c.closePath();
-            c.fillStyle = '#666666';
-            c.fill();
         }
         
         function circumcircle(p1, p2, p3)
@@ -61,11 +62,12 @@
         
         function inCircle(point, circle)
         {
-            var distance = Math.sqrt(Math.pow(point[0] - circle[0], 2), Math.pow(point[1] - circle[1], 2));
-            return distance <= circle[2];
+            var distance = Math.sqrt(Math.pow(point[0] - circle[0], 2) + Math.pow(point[1] - circle[1], 2));
+            return distance < circle[2];
         }
         
-        var supertriangle = [[-w/2, 0], [w*3/2, 0], [w/2, h*2]];
+        //var supertriangle = [[-w/2, 0], [w*3/2, 0], [w/2, h*2]];
+        var supertriangle = [[0, 0], [w, 0], [w/2, h]];
         points.push(supertriangle[0]);
         points.push(supertriangle[1]);
         points.push(supertriangle[2]);
@@ -82,6 +84,7 @@
             {
                 var tri = triangles[i];
                 var cc = circumcircle(tri[0], tri[1], tri[2]);
+
                 if(inCircle(point, cc))
                 {
                     edges.push([tri[0], tri[1]]);
@@ -99,9 +102,9 @@
             {
                 var unique = true;
                 
-                for(var j = i + 1; j < edges.length; j += 1)
+                for(var j = 0; j < edges.length; j += 1)
                 {
-                    if(edgesMatch(edges[i], edges[j]))
+                    if(i != j && edgesMatch(edges[i], edges[j]))
                     {
                         unique = false;
                     }
@@ -112,8 +115,6 @@
                     uniqEdges.push(edges[i]);
                 }
             }
-            
-            //alert(allEdges.length + ' vs ' + uniqEdges.length);
             
             edges = uniqEdges;
             
@@ -144,7 +145,7 @@
             c.lineTo(p3[0], p3[1]);
             c.lineTo(p1[0], p1[1]);
             c.closePath();
-            c.strokeStyle = '#ff0000';
+            c.strokeStyle = '#999';
             c.stroke();
         }
         
@@ -157,6 +158,15 @@
         {
             var t = triangles[i];
             drawTriangle(c, t[0], t[1], t[2]);
+        }
+        
+        for(var i = 0; i < points.length; i += 1)
+        {
+            c.beginPath();
+            c.arc(points[i][0], points[i][1], 3, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = '#666666';
+            c.fill();
         }
     
     //-->
