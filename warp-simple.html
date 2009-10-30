@@ -57,6 +57,8 @@
         var m1 = new Marker(new mm.Location(37.808055, -122.264507), new mm.Point(2296, 465)); // 20th & Harrison
         var m2 = new Marker(new mm.Location(37.802036, -122.269700), new mm.Point(2480, 982)); // 12th & Webster
         var m3 = new Marker(new mm.Location(37.799730, -122.263756), new mm.Point(2812, 813)); // 12th & Oak
+        var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Point(2654, 506)); // 17th & Oak
+        var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Point(1868, 773)); // 20th & San Pablo
         
         function warpTo(zoomifyProvider, destinationMap, m1, m2, m3)
         {
@@ -106,6 +108,7 @@
             c.lineTo(c1.column, c1.row)
             c.closePath();
             c.clip();
+            c.globalAlpha = .65;
             
             // tile space zoom-corrected coordinates of triangle corners
             c1 = c1.zoomBy(-8);
@@ -158,6 +161,8 @@
         }
         
         warpTo(zoomify, combine, m1, m2, m3);
+        warpTo(zoomify, combine, m1, m4, m3);
+        warpTo(zoomify, combine, m1, m2, m5);
     
     //-->
     </script>
