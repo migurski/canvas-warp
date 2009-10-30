@@ -1,0 +1,46 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Canvas Zoomify</title>
+    <script src="modestmaps.js" type="text/javascript" language="javascript1.5"></script>
+    <script src="zoomify.js" type="text/javascript" language="javascript1.5"></script>
+    <style type="text/css" title="text/css">
+    <!--
+        body { background-color: #bbb; }
+
+        .map
+        {
+            border: 1px solid black;
+            background-color: #ccc;
+            width: 550px;
+            height: 390px;
+            margin-right: 1em;
+            float: left;
+        }
+    -->
+    </style>
+</head>
+<body>
+
+    <div id="picture" class="map"></div>
+    <div id="basemap" class="map"></div>
+    <script type="text/javascript" language="javascript1.5">
+    <!--
+    
+        var mm = com.modestmaps;
+
+        var picture = new mm.Map('picture', new ZoomifyProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670), new mm.Point(550, 390))
+        picture.setCenterZoom(new mm.Location(559, 2563), 5);
+        picture.draw();
+
+        var basemap = new mm.Map('basemap', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
+        basemap.setCenterZoom(new mm.Location(37.805, -122.263), 15);
+        basemap.draw();
+    
+    //-->
+    </script>
+
+</body>
+</html>
