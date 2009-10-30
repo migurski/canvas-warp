@@ -47,7 +47,7 @@ var ZoomifyProvider = function(dir, width, height)
     }
 };
 
-ZoomifyProvider.prototype = mm.MapProvider.prototype;
+com.modestmaps.extend(ZoomifyProvider, com.modestmaps.MapProvider);
 
 ZoomifyProvider.prototype.coordinateGroup = function(c)
 {
