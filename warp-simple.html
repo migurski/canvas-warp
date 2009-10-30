@@ -3,8 +3,9 @@
 <html lang="en">
 <head>
 	<meta http-equiv="content-type" content="text/html; charset=utf-8">
-	<title>Canvas Zoomify</title>
+	<title>Canvas Warp Simple</title>
     <script src="modestmaps.js" type="text/javascript" language="javascript1.5"></script>
+    <script src="follower.js" type="text/javascript" language="javascript1.5"></script>
     <script src="zoomify.js" type="text/javascript" language="javascript1.5"></script>
     <style type="text/css" title="text/css">
     <!--
@@ -12,12 +13,12 @@
 
         .map
         {
-            border: 1px solid black;
-            background-color: #ccc;
-            width: 550px;
-            height: 390px;
-            margin-right: 1em;
-            float: left;
+        	border: 1px solid black;
+        	background-color: #ccc;
+        	width: 550px;
+        	height: 390px;
+        	margin: 0 1em 1em 0;
+        	float: left;
         }
     -->
     </style>
@@ -26,18 +27,128 @@
 
     <div id="picture" class="map"></div>
     <div id="basemap" class="map"></div>
+    <div id="combine" class="map"></div>
+
     <script type="text/javascript" language="javascript1.5">
     <!--
     
         var mm = com.modestmaps;
+        
+        var zoomify = new ZoomifyProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670);
 
-        var picture = new mm.Map('picture', new ZoomifyProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670), new mm.Point(550, 390))
+        var picture = new mm.Map('picture', zoomify, new mm.Point(550, 390))
         picture.setCenterZoom(new mm.Location(559, 2563), 5);
         picture.draw();
 
         var basemap = new mm.Map('basemap', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
         basemap.setCenterZoom(new mm.Location(37.805, -122.263), 15);
         basemap.draw();
+
+        var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
+        combine.setCenterZoom(new mm.Location(37.805, -122.263), 15);
+        combine.draw();
+        
+        var m1 = [37.808055, -122.264507, 2296, 465]; // 20th & Harrison
+        var m2 = [37.802952, -122.267640, 2499, 845]; // 14th & Harrison
+        var m3 = [37.801104, -122.262940, 2761, 711]; // 14th & Oak
+        
+        //var f1 = new mm.Follower(combine, new mm.Location(m1[0], m1[1]), 'hello');
+        
+        // pixel positions of triangle corners
+        var p1 = combine.locationPoint(new mm.Location(m1[0], m1[1]));
+        var p2 = combine.locationPoint(new mm.Location(m2[0], m2[1]));
+        var p3 = combine.locationPoint(new mm.Location(m3[0], m3[1]));
+        
+        var canvas = document.createElement('canvas');
+        canvas.style.position = 'absolute';
+        canvas.width = 550;
+        canvas.height = 390;
+        combine.parent.appendChild(canvas);
+        var c = canvas.getContext('2d');
+        
+        // coordinates of triangle corners
+        var c1 = new mm.Coordinate(m1[3], m1[2], zoomify.bottomright.zoom);
+        var c2 = new mm.Coordinate(m2[3], m2[2], zoomify.bottomright.zoom);
+        var c3 = new mm.Coordinate(m3[3], m3[2], zoomify.bottomright.zoom);
+        
+        // transformation from image pixel space to html pixel space
+        var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
+        //alert([t.ax, t.bx, t.cx, t.ay, t.by, t.cy]);
+        
+        // get the best resampled zoom level from the image pyramid
+        var sx = Math.sqrt(Math.pow(t.ax, 2) + Math.pow(t.bx, 2));
+        var sy = Math.sqrt(Math.pow(t.ay, 2) + Math.pow(t.by, 2));
+        var s = Math.max(sx, sy); //(sx + sy) / 2;
+        var z = zoomify.bottomright.zoom + Math.round(Math.log(s) / Math.LN2);
+        //alert(['native zoom level', z].join('\n'));
+        
+        // pixel space zoom-corrected coordinates of triangle corners
+        c1 = c1.zoomTo(z);
+        c2 = c2.zoomTo(z);
+        c3 = c3.zoomTo(z);
+
+        // do this again at the corrected zoom
+        var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
+        alert(['pixel space transform', t.ax, t.bx, t.cx, t.ay, t.by, t.cy].join('\n'));
+
+        c.save();
+        c.setTransform(t.ax, t.ay, t.bx, t.by, t.cx, t.cy);
+        c.beginPath();
+        c.moveTo(c1.column, c1.row)
+        c.lineTo(c2.column, c2.row)
+        c.lineTo(c3.column, c3.row)
+        c.lineTo(c1.column, c1.row)
+        c.closePath();
+        c.clip();
+        
+        // tile space zoom-corrected coordinates of triangle corners
+        c1 = c1.zoomBy(-8);
+        c2 = c2.zoomBy(-8);
+        c3 = c3.zoomBy(-8);
+
+        var minrow = Math.min(c1.row, c2.row, c3.row);
+        var maxrow = Math.max(c1.row, c2.row, c3.row);
+        var mincol = Math.min(c1.column, c2.column, c3.column);
+        var maxcol = Math.max(c1.column, c2.column, c3.column);
+
+        var ul = new mm.Coordinate(minrow, mincol, c1.zoom).container();
+        var br = new mm.Coordinate(maxrow, maxcol, c1.zoom).container();
+        
+        alert(['boundaries of triangle', minrow, mincol, maxrow, maxcol, ul, br].join('\n'));
+        
+        var tiles = [];
+        
+        for(var row = ul.row; row <= br.row; row += 1)
+        {
+            for(var col = ul.column; col <= br.column; col += 1)
+            {
+                var tile = new mm.Coordinate(row, col, ul.zoom);
+                var offset = new mm.Point(tile.zoomBy(8).column, tile.zoomBy(8).row);
+                var url = zoomify.getTileUrl(tile);
+                
+                tiles.push({tile: tile, offset: offset, url: url});
+            }
+        }
+        
+        function drawTiles(c, tiles)
+        {
+            if(tiles.length)
+            {
+                var tou = tiles.shift();
+                var img = new Image();
+                
+                img.onload = function()
+                {
+                    c.drawImage(this, tou.offset.x, tou.offset.y, 256, 256);
+                    drawTiles(c, tiles);
+                }
+                
+                img.src = tou.url;
+            }
+        }
+        
+        alert('Drawing ' + tiles.length + ' tiles');
+        drawTiles(c, tiles);
     
     //-->
     </script>

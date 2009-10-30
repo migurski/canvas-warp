@@ -7,9 +7,10 @@ var ZoomifyProvider = function(dir, width, height)
     // we're pretending to be dealing with degrees but really they're pixels
     var t = mm.Transformation.prototype.deriveTransformation(0, 0, 0, 0, width * Math.PI/180, 0, width, 0, 0, height * Math.PI/180, 0, height);
     this.projection = new mm.LinearProjection(zoom, t);
-
+    this.bottomright = new mm.Coordinate(height, width, zoom);
+    
     var topLeftOutLimit = new mm.Coordinate(0, 0, 0);
-    var bottomRightInLimit = (new mm.Coordinate(height, width, zoom)).zoomBy(-8);
+    var bottomRightInLimit = this.bottomright.zoomBy(-8);
     var groups = [];
     var i = 0;
     
