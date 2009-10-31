@@ -26,7 +26,7 @@
 <body>
 
     <div id="picture" class="map"></div>
-    <div id="basemap" class="map"></div>
+    <!--<div id="basemap" class="map"></div>-->
     <div id="combine" class="map"></div>
 
     <script type="text/javascript" language="javascript1.5">
@@ -46,9 +46,11 @@
         picture.setCenterZoom(new mm.Location(559, 2563), 5);
         picture.draw();
 
+        /*
         var basemap = new mm.Map('basemap', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
         basemap.setCenterZoom(new mm.Location(37.805, -122.263), 15);
         basemap.draw();
+        */
 
         var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
         combine.setCenterZoom(new mm.Location(37.805, -122.263), 15);
@@ -178,9 +180,103 @@
         {
             combine.revision += 1;
             canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
             warpTo(zoomify, combine, canvas, m1, m2, m3, combine.revision);
             warpTo(zoomify, combine, canvas, m1, m4, m3, combine.revision);
             warpTo(zoomify, combine, canvas, m1, m2, m5, combine.revision);
+            
+            // what follows is a potentially stupid way to do 2-dim linear regression
+
+            var markers = [m1, m2, m3, m4, m5];
+            
+            var avglat = 0;
+            var avglon = 0;
+            var avgx = 0;
+            var avgy = 0;
+            var j = 0;
+            
+            for(var i = 0; i < markers.length; i += 1)
+            {
+                avglat = ((j * avglat) + markers[i].location.lat) / (j + 1);
+                avglon = ((j * avglon) + markers[i].location.lon) / (j + 1);
+                avgx = ((j * avgx) + markers[i].point.x) / (j + 1);
+                avgy = ((j * avgy) + markers[i].point.y) / (j + 1);
+                j += 1;
+            }
+            
+            //alert([avgx, avgy, avglat, avglon]);
+        
+            var num = 0;
+            var den = 0;
+            
+            for(var i in markers)
+            {
+                num += (markers[i].point.x - avgx) * (markers[i].location.lon - avglon);
+                den += (markers[i].point.x - avgx) * (markers[i].point.x - avgx);
+            }
+        
+            var lonmx = num/den;
+            var lonbx = avglon - (lonmx * avgx);
+            //alert([lonmx, lonbx]);
+        
+            var num = 0;
+            var den = 0;
+            
+            for(var i in markers)
+            {
+                num += (markers[i].point.y - avgy) * (markers[i].location.lon - avglon);
+                den += (markers[i].point.y - avgy) * (markers[i].point.y - avgy);
+            }
+        
+            var lonmy = num/den;
+            var lonby = avglon - (lonmy * avgy);
+            //alert([lonmy, lonby]);
+            
+            var estlon = function(x, y) { return lonmx * x + lonmy * y + (lonbx + lonby) / 2; }
+        
+            var num = 0;
+            var den = 0;
+            
+            for(var i in markers)
+            {
+                num += (markers[i].point.x - avgx) * (markers[i].location.lat - avglat);
+                den += (markers[i].point.x - avgx) * (markers[i].point.x - avgx);
+            }
+        
+            var latmx = num/den;
+            var latbx = avglat - (latmx * avgx);
+            //alert([latmx, latbx]);
+        
+            var num = 0;
+            var den = 0;
+            
+            for(var i in markers)
+            {
+                num += (markers[i].point.y - avgy) * (markers[i].location.lat - avglat);
+                den += (markers[i].point.y - avgy) * (markers[i].point.y - avgy);
+            }
+        
+            var latmy = num/den;
+            var latby = avglat - (latmy * avgy);
+            //alert([latmy, latby]);
+            
+            var estlat = function(x, y) { return latmx * x + latmy * y + (latbx + latby) / 2; }
+            
+            var c = canvas.getContext('2d');
+            var ul = new mm.Location(estlat(0, 0), estlon(0, 0));
+            var bl = new mm.Location(estlat(0, zoomify.bottomright.row), estlon(0, zoomify.bottomright.row));
+            var ur = new mm.Location(estlat(zoomify.bottomright.column, 0), estlon(zoomify.bottomright.column, 0));
+            var br = new mm.Location(estlat(zoomify.bottomright.column, zoomify.bottomright.row), estlon(zoomify.bottomright.column, zoomify.bottomright.row));
+            
+            c.save();
+            c.setTransform();
+            c.beginPath();
+            c.moveTo(combine.locationPoint(bl).x, combine.locationPoint(bl).y);
+            c.lineTo(combine.locationPoint(ul).x, combine.locationPoint(ul).y);
+            c.lineTo(combine.locationPoint(ur).x, combine.locationPoint(ur).y);
+            c.lineTo(combine.locationPoint(br).x, combine.locationPoint(br).y);
+            c.stroke();
+            c.restore();
         }
         
         onMapChanged();
