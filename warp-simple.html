@@ -52,6 +52,7 @@
 
         var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
         combine.setCenterZoom(new mm.Location(37.805, -122.263), 15);
+        combine.revision = 1;
         combine.addCallback('zoomed',    function(m, a) { return onMapChanged(); });
         combine.addCallback('centered',  function(m, a) { return onMapChanged(); });
         combine.addCallback('extentset', function(m, a) { return onMapChanged(); });
@@ -70,7 +71,7 @@
         var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Point(2654, 506)); // 17th & Oak
         var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Point(1868, 773)); // 20th & San Pablo
         
-        function warpTo(zoomifyProvider, destinationMap, canvas, m1, m2, m3)
+        function warpTo(zoomifyProvider, destinationMap, canvas, m1, m2, m3, revision)
         {
             // pixel positions of triangle corners
             var p1 = destinationMap.locationPoint(m1.location);
@@ -90,8 +91,8 @@
             var sx = Math.sqrt(Math.pow(t.ax, 2) + Math.pow(t.bx, 2));
             var sy = Math.sqrt(Math.pow(t.ay, 2) + Math.pow(t.by, 2));
             var s = Math.max(sx, sy); //(sx + sy) / 2;
-            var z = zoomifyProvider.bottomright.zoom + Math.round(Math.log(s) / Math.LN2);
-            //alert(['native zoom level', z].join('\n'));
+            var z = zoomifyProvider.bottomright.zoom + Math.min(0, Math.round(Math.log(s) / Math.LN2));
+            //alert(['native zoom level', z, Math.min(0, Math.round(Math.log(s) / Math.LN2)), zoomifyProvider.bottomright.zoom].join('\n'));
             
             // pixel space zoom-corrected coordinates of triangle corners
             c1 = c1.zoomTo(z);
@@ -136,10 +137,10 @@
             }
             
             //alert('Drawing ' + tiles.length + ' tiles');
-            drawTiles(canvas.getContext('2d'), tiles);
+            drawTiles(canvas.getContext('2d'), tiles, destinationMap, revision);
         }
         
-        function drawTiles(c, tiles)
+        function drawTiles(c, tiles, destinationMap, revision)
         {
             if(tiles.length)
             {
@@ -148,8 +149,11 @@
                 
                 img.onload = function()
                 {
-                    //alert([tile.offset, tile.triangle, tile.transform].join('\n\n'));
-
+                    if(destinationMap.revision != revision)
+                    {
+                        return;
+                    }
+        
                     c.save();
                     c.setTransform(tile.transform[0], tile.transform[1], tile.transform[2], tile.transform[3], tile.transform[4], tile.transform[5]);
                     c.beginPath();
@@ -163,7 +167,7 @@
                     c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
                     c.restore();
 
-                    drawTiles(c, tiles);
+                    drawTiles(c, tiles, destinationMap, revision);
                 }
                 
                 img.src = tile.url;
@@ -172,10 +176,11 @@
         
         function onMapChanged()
         {
+            combine.revision += 1;
             canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-            warpTo(zoomify, combine, canvas, m1, m2, m3);
-            warpTo(zoomify, combine, canvas, m1, m4, m3);
-            warpTo(zoomify, combine, canvas, m1, m2, m5);
+            warpTo(zoomify, combine, canvas, m1, m2, m3, combine.revision);
+            warpTo(zoomify, combine, canvas, m1, m4, m3, combine.revision);
+            warpTo(zoomify, combine, canvas, m1, m2, m5, combine.revision);
         }
         
         onMapChanged();
