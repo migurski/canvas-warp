@@ -52,27 +52,30 @@
 
         var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
         combine.setCenterZoom(new mm.Location(37.805, -122.263), 15);
+        combine.addCallback('zoomed',    function(m, a) { return onMapChanged(); });
+        combine.addCallback('centered',  function(m, a) { return onMapChanged(); });
+        combine.addCallback('extentset', function(m, a) { return onMapChanged(); });
+        combine.addCallback('panned',    function(m, a) { return onMapChanged(); });
         combine.draw();
         
+        var canvas = document.createElement('canvas');
+        canvas.style.position = 'absolute';
+        canvas.width = 550;
+        canvas.height = 390;
+        combine.parent.appendChild(canvas);
+
         var m1 = new Marker(new mm.Location(37.808055, -122.264507), new mm.Point(2296, 465)); // 20th & Harrison
         var m2 = new Marker(new mm.Location(37.802036, -122.269700), new mm.Point(2480, 982)); // 12th & Webster
         var m3 = new Marker(new mm.Location(37.799730, -122.263756), new mm.Point(2812, 813)); // 12th & Oak
         var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Point(2654, 506)); // 17th & Oak
         var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Point(1868, 773)); // 20th & San Pablo
         
-        function warpTo(zoomifyProvider, destinationMap, m1, m2, m3)
+        function warpTo(zoomifyProvider, destinationMap, canvas, m1, m2, m3)
         {
             // pixel positions of triangle corners
             var p1 = destinationMap.locationPoint(m1.location);
             var p2 = destinationMap.locationPoint(m2.location);
             var p3 = destinationMap.locationPoint(m3.location);
-            
-            var canvas = document.createElement('canvas');
-            canvas.style.position = 'absolute';
-            canvas.width = 550;
-            canvas.height = 390;
-            destinationMap.parent.appendChild(canvas);
-            var c = canvas.getContext('2d');
             
             // coordinates of triangle corners
             var c1 = new mm.Coordinate(m1.point.y, m1.point.x, zoomifyProvider.bottomright.zoom);
@@ -98,18 +101,11 @@
             // do this again at the corrected zoom
             var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
             //alert(['pixel space transform', t.ax, t.bx, t.cx, t.ay, t.by, t.cy].join('\n'));
-    
-            c.save();
-            c.setTransform(t.ax, t.ay, t.bx, t.by, t.cx, t.cy);
-            c.beginPath();
-            c.moveTo(c1.column, c1.row)
-            c.lineTo(c2.column, c2.row)
-            c.lineTo(c3.column, c3.row)
-            c.lineTo(c1.column, c1.row)
-            c.closePath();
-            c.clip();
-            c.globalAlpha = .65;
             
+            // for later, in pixel space
+            var triangle = [c1.column, c1.row, c2.column, c2.row, c3.column, c3.row];
+            var transform = [t.ax, t.ay, t.bx, t.by, t.cx, t.cy];
+    
             // tile space zoom-corrected coordinates of triangle corners
             c1 = c1.zoomBy(-8);
             c2 = c2.zoomBy(-8);
@@ -135,34 +131,54 @@
                     var offset = new mm.Point(tile.zoomBy(8).column, tile.zoomBy(8).row);
                     var url = zoomifyProvider.getTileUrl(tile);
                     
-                    tiles.push({tile: tile, offset: offset, url: url});
+                    tiles.push({tile: tile, offset: offset, url: url, transform: transform, triangle: triangle});
                 }
             }
             
             //alert('Drawing ' + tiles.length + ' tiles');
-            drawTiles(c, tiles);
+            drawTiles(canvas.getContext('2d'), tiles);
         }
         
         function drawTiles(c, tiles)
         {
             if(tiles.length)
             {
-                var tou = tiles.shift();
+                var tile = tiles.shift();
                 var img = new Image();
                 
                 img.onload = function()
                 {
-                    c.drawImage(this, tou.offset.x, tou.offset.y, 256, 256);
+                    //alert([tile.offset, tile.triangle, tile.transform].join('\n\n'));
+
+                    c.save();
+                    c.setTransform(tile.transform[0], tile.transform[1], tile.transform[2], tile.transform[3], tile.transform[4], tile.transform[5]);
+                    c.beginPath();
+                    c.moveTo(tile.triangle[0], tile.triangle[1]);
+                    c.lineTo(tile.triangle[2], tile.triangle[3]);
+                    c.lineTo(tile.triangle[4], tile.triangle[5]);
+                    c.lineTo(tile.triangle[0], tile.triangle[1]);
+                    c.closePath();
+                    c.clip();
+                    c.globalAlpha = .65;
+                    c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
+                    c.restore();
+
                     drawTiles(c, tiles);
                 }
                 
-                img.src = tou.url;
+                img.src = tile.url;
             }
         }
         
-        warpTo(zoomify, combine, m1, m2, m3);
-        warpTo(zoomify, combine, m1, m4, m3);
-        warpTo(zoomify, combine, m1, m2, m5);
+        function onMapChanged()
+        {
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+            warpTo(zoomify, combine, canvas, m1, m2, m3);
+            warpTo(zoomify, combine, canvas, m1, m4, m3);
+            warpTo(zoomify, combine, canvas, m1, m2, m5);
+        }
+        
+        onMapChanged();
     
     //-->
     </script>
