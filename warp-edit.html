@@ -39,9 +39,11 @@
             this.img = img;
         }
         
-        var Follower = function(map, location)
+        var Follower = function(mesh, map, location)
         {
             this.map = map;
+            this.mesh = mesh;
+            this.location = location;
             this.coord = map.provider.locationCoordinate(location);
             
             var follower = this;
@@ -71,7 +73,9 @@
         
             map: null,
             div: null,
+            mesh: null,
             coord: null,
+            location: null,
             
             zoomed: function(map)
             {
@@ -137,9 +141,12 @@
                     y -= node.offsetTop;
                 }
                 
-                this.coord = this.map.pointCoordinate(new mm.Point(x, y));
+                var loc = this.map.pointLocation(new mm.Point(x, y));
+                this.coord = this.map.provider.locationCoordinate(loc);
+                this.location.lat = loc.lat;
+                this.location.lon = loc.lon;
                 this.draw();
-                onMapChanged();
+                this.mesh.draw();
             },
             
             onmouseup: function(e)
@@ -166,11 +173,6 @@
 
         var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
         combine.setCenterZoom(new mm.Location(37.805, -122.263), 15);
-        combine.revision = 1;
-        combine.addCallback('zoomed',    function(m, a) { return onMapChanged(); });
-        combine.addCallback('centered',  function(m, a) { return onMapChanged(); });
-        combine.addCallback('extentset', function(m, a) { return onMapChanged(); });
-        combine.addCallback('panned',    function(m, a) { return onMapChanged(); });
         combine.draw();
         
         var canvas = document.createElement('canvas');
@@ -179,12 +181,152 @@
         canvas.height = 390;
         combine.parent.appendChild(canvas);
         
-        var Mesh = function(picture, basemap, markers)
+        var Mesh = function(picture, basemap, canvas, markers, triangles)
         {
+            this.canvas = canvas;
             this.picture = picture;
             this.basemap = basemap;
             this.markers = markers;
+            this.triangles = triangles;
+            this.revision = 1;
+
+            var mesh = this;
+            this.basemap.addCallback('zoomed',    function(m, a) { return mesh.draw(); });
+            this.basemap.addCallback('centered',  function(m, a) { return mesh.draw(); });
+            this.basemap.addCallback('extentset', function(m, a) { return mesh.draw(); });
+            this.basemap.addCallback('panned',    function(m, a) { return mesh.draw(); });
+            
+            for(var i in markers)
+            {
+                var f1 = new Follower(this, picture, markers[i].img);
+                var f2 = new Follower(this, basemap, markers[i].geo);
+            }
         }
+        
+        Mesh.prototype = {
+        
+            picture: null,
+            basemap: null,
+            markers: null,
+            triangles: null,
+            
+            draw: function()
+            {
+                this.revision += 1;
+                this.canvas.getContext('2d').clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                for(var i in this.triangles)
+                {
+                    this.warpTo(this.triangles[i][0], this.triangles[i][1], this.triangles[i][2], this.revision);
+                }
+            },
+            
+            warpTo: function(m1, m2, m3, revision)
+            {
+                // pixel positions of triangle corners
+                var p1 = this.basemap.locationPoint(m1.geo);
+                var p2 = this.basemap.locationPoint(m2.geo);
+                var p3 = this.basemap.locationPoint(m3.geo);
+                
+                // coordinates of triangle corners
+                var c1 = new mm.Coordinate(m1.img.lat, m1.img.lon, this.picture.provider.bottomright.zoom);
+                var c2 = new mm.Coordinate(m2.img.lat, m2.img.lon, this.picture.provider.bottomright.zoom);
+                var c3 = new mm.Coordinate(m3.img.lat, m3.img.lon, this.picture.provider.bottomright.zoom);
+                
+                // transformation from image pixel space to html pixel space
+                var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
+                //alert([t.ax, t.bx, t.cx, t.ay, t.by, t.cy]);
+                
+                // get the best resampled zoom level from the image pyramid
+                var sx = Math.sqrt(Math.pow(t.ax, 2) + Math.pow(t.bx, 2));
+                var sy = Math.sqrt(Math.pow(t.ay, 2) + Math.pow(t.by, 2));
+                var s = Math.max(sx, sy); //(sx + sy) / 2;
+                var z = this.picture.provider.bottomright.zoom + Math.min(0, Math.round(Math.log(s) / Math.LN2));
+                //alert(['native zoom level', z, Math.min(0, Math.round(Math.log(s) / Math.LN2)), this.picture.provider.bottomright.zoom].join('\n'));
+                
+                // pixel space zoom-corrected coordinates of triangle corners
+                c1 = c1.zoomTo(z);
+                c2 = c2.zoomTo(z);
+                c3 = c3.zoomTo(z);
+        
+                // do this again at the corrected zoom
+                var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
+                //alert(['pixel space transform', t.ax, t.bx, t.cx, t.ay, t.by, t.cy].join('\n'));
+                
+                // for later, in pixel space
+                var triangle = [c1.column, c1.row, c2.column, c2.row, c3.column, c3.row];
+                var transform = [t.ax, t.ay, t.bx, t.by, t.cx, t.cy];
+        
+                // tile space zoom-corrected coordinates of triangle corners
+                c1 = c1.zoomBy(-8);
+                c2 = c2.zoomBy(-8);
+                c3 = c3.zoomBy(-8);
+        
+                var minrow = Math.min(c1.row, c2.row, c3.row);
+                var maxrow = Math.max(c1.row, c2.row, c3.row);
+                var mincol = Math.min(c1.column, c2.column, c3.column);
+                var maxcol = Math.max(c1.column, c2.column, c3.column);
+        
+                var ul = new mm.Coordinate(minrow, mincol, c1.zoom).container();
+                var br = new mm.Coordinate(maxrow, maxcol, c1.zoom).container();
+                
+                //alert(['boundaries of triangle', minrow, mincol, maxrow, maxcol, ul, br].join('\n'));
+                
+                var tiles = [];
+                
+                for(var row = ul.row; row <= br.row; row += 1)
+                {
+                    for(var col = ul.column; col <= br.column; col += 1)
+                    {
+                        var tile = new mm.Coordinate(row, col, ul.zoom);
+                        var offset = new mm.Point(tile.zoomBy(8).column, tile.zoomBy(8).row);
+                        var url = this.picture.provider.getTileUrl(tile);
+                        
+                        tiles.push({tile: tile, offset: offset, url: url, transform: transform, triangle: triangle});
+                    }
+                }
+                
+                //alert('Drawing ' + tiles.length + ' tiles');
+                this.drawTiles(tiles, revision);
+            },
+            
+            drawTiles: function(tiles, revision)
+            {
+                var mesh = this;
+                var c = this.canvas.getContext('2d');
+
+                if(tiles.length)
+                {
+                    var tile = tiles.shift();
+                    var img = new Image();
+                    
+                    img.onload = function()
+                    {
+                        if(mesh.revision != revision)
+                        {
+                            return;
+                        }
+            
+                        c.save();
+                        c.setTransform(tile.transform[0], tile.transform[1], tile.transform[2], tile.transform[3], tile.transform[4], tile.transform[5]);
+                        c.beginPath();
+                        c.moveTo(tile.triangle[0], tile.triangle[1]);
+                        c.lineTo(tile.triangle[2], tile.triangle[3]);
+                        c.lineTo(tile.triangle[4], tile.triangle[5]);
+                        c.lineTo(tile.triangle[0], tile.triangle[1]);
+                        c.closePath();
+                        c.clip();
+                        c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
+                        c.restore();
+    
+                        mesh.drawTiles(tiles, revision);
+                    }
+                    
+                    img.src = tile.url;
+                }
+            }
+        
+        };
 
         var m1 = new Marker(new mm.Location(37.808055, -122.264507), new mm.Location(465, 2296)); // 20th & Harrison
         var m2 = new Marker(new mm.Location(37.802036, -122.269700), new mm.Location(982, 2480)); // 12th & Webster
@@ -192,215 +334,9 @@
         var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Location(506, 2654)); // 17th & Oak
         var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Location(773, 1868)); // 20th & San Pablo
         
-        var f = new Follower(combine, m1.geo);
+        var m = new Mesh(picture, combine, canvas, [m1, m2, m3, m4, m5], [[m1, m2, m3], [m1, m4, m3], [m1, m2, m5]]);
+        m.draw();
         
-        function warpTo(zoomifyProvider, destinationMap, canvas, m1, m2, m3, revision)
-        {
-            // pixel positions of triangle corners
-            var p1 = destinationMap.locationPoint(m1.geo);
-            var p2 = destinationMap.locationPoint(m2.geo);
-            var p3 = destinationMap.locationPoint(m3.geo);
-            
-            // coordinates of triangle corners
-            var c1 = new mm.Coordinate(m1.img.lat, m1.img.lon, zoomifyProvider.bottomright.zoom);
-            var c2 = new mm.Coordinate(m2.img.lat, m2.img.lon, zoomifyProvider.bottomright.zoom);
-            var c3 = new mm.Coordinate(m3.img.lat, m3.img.lon, zoomifyProvider.bottomright.zoom);
-            
-            // transformation from image pixel space to html pixel space
-            var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
-            //alert([t.ax, t.bx, t.cx, t.ay, t.by, t.cy]);
-            
-            // get the best resampled zoom level from the image pyramid
-            var sx = Math.sqrt(Math.pow(t.ax, 2) + Math.pow(t.bx, 2));
-            var sy = Math.sqrt(Math.pow(t.ay, 2) + Math.pow(t.by, 2));
-            var s = Math.max(sx, sy); //(sx + sy) / 2;
-            var z = zoomifyProvider.bottomright.zoom + Math.min(0, Math.round(Math.log(s) / Math.LN2));
-            //alert(['native zoom level', z, Math.min(0, Math.round(Math.log(s) / Math.LN2)), zoomifyProvider.bottomright.zoom].join('\n'));
-            
-            // pixel space zoom-corrected coordinates of triangle corners
-            c1 = c1.zoomTo(z);
-            c2 = c2.zoomTo(z);
-            c3 = c3.zoomTo(z);
-    
-            // do this again at the corrected zoom
-            var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
-            //alert(['pixel space transform', t.ax, t.bx, t.cx, t.ay, t.by, t.cy].join('\n'));
-            
-            // for later, in pixel space
-            var triangle = [c1.column, c1.row, c2.column, c2.row, c3.column, c3.row];
-            var transform = [t.ax, t.ay, t.bx, t.by, t.cx, t.cy];
-    
-            // tile space zoom-corrected coordinates of triangle corners
-            c1 = c1.zoomBy(-8);
-            c2 = c2.zoomBy(-8);
-            c3 = c3.zoomBy(-8);
-    
-            var minrow = Math.min(c1.row, c2.row, c3.row);
-            var maxrow = Math.max(c1.row, c2.row, c3.row);
-            var mincol = Math.min(c1.column, c2.column, c3.column);
-            var maxcol = Math.max(c1.column, c2.column, c3.column);
-    
-            var ul = new mm.Coordinate(minrow, mincol, c1.zoom).container();
-            var br = new mm.Coordinate(maxrow, maxcol, c1.zoom).container();
-            
-            //alert(['boundaries of triangle', minrow, mincol, maxrow, maxcol, ul, br].join('\n'));
-            
-            var tiles = [];
-            
-            for(var row = ul.row; row <= br.row; row += 1)
-            {
-                for(var col = ul.column; col <= br.column; col += 1)
-                {
-                    var tile = new mm.Coordinate(row, col, ul.zoom);
-                    var offset = new mm.Point(tile.zoomBy(8).column, tile.zoomBy(8).row);
-                    var url = zoomifyProvider.getTileUrl(tile);
-                    
-                    tiles.push({tile: tile, offset: offset, url: url, transform: transform, triangle: triangle});
-                }
-            }
-            
-            //alert('Drawing ' + tiles.length + ' tiles');
-            drawTiles(canvas.getContext('2d'), tiles, destinationMap, revision);
-        }
-        
-        function drawTiles(c, tiles, destinationMap, revision)
-        {
-            if(tiles.length)
-            {
-                var tile = tiles.shift();
-                var img = new Image();
-                
-                img.onload = function()
-                {
-                    if(destinationMap.revision != revision)
-                    {
-                        return;
-                    }
-        
-                    c.save();
-                    c.setTransform(tile.transform[0], tile.transform[1], tile.transform[2], tile.transform[3], tile.transform[4], tile.transform[5]);
-                    c.beginPath();
-                    c.moveTo(tile.triangle[0], tile.triangle[1]);
-                    c.lineTo(tile.triangle[2], tile.triangle[3]);
-                    c.lineTo(tile.triangle[4], tile.triangle[5]);
-                    c.lineTo(tile.triangle[0], tile.triangle[1]);
-                    c.closePath();
-                    c.clip();
-                    c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
-                    c.restore();
-
-                    drawTiles(c, tiles, destinationMap, revision);
-                }
-                
-                img.src = tile.url;
-            }
-        }
-        
-        function onMapChanged()
-        {
-            combine.revision += 1;
-            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-
-            warpTo(zoomify, combine, canvas, m1, m2, m3, combine.revision);
-            warpTo(zoomify, combine, canvas, m1, m4, m3, combine.revision);
-            warpTo(zoomify, combine, canvas, m1, m2, m5, combine.revision);
-            
-            // what follows is a potentially stupid way to do 2-dim linear regression
-
-            var markers = [m1, m2, m3, m4, m5];
-            
-            var avglat = 0;
-            var avglon = 0;
-            var avgx = 0;
-            var avgy = 0;
-            var j = 0;
-            
-            for(var i = 0; i < markers.length; i += 1)
-            {
-                avglat = ((j * avglat) + markers[i].geo.lat) / (j + 1);
-                avglon = ((j * avglon) + markers[i].geo.lon) / (j + 1);
-                avgx = ((j * avgx) + markers[i].img.lon) / (j + 1);
-                avgy = ((j * avgy) + markers[i].img.lat) / (j + 1);
-                j += 1;
-            }
-            
-            //alert([avgx, avgy, avglat, avglon]);
-        
-            var num = 0;
-            var den = 0;
-            
-            for(var i in markers)
-            {
-                num += (markers[i].img.lon - avgx) * (markers[i].geo.lon - avglon);
-                den += (markers[i].img.lon - avgx) * (markers[i].img.lon - avgx);
-            }
-        
-            var lonmx = num/den;
-            var lonbx = avglon - (lonmx * avgx);
-            //alert([lonmx, lonbx]);
-        
-            var num = 0;
-            var den = 0;
-            
-            for(var i in markers)
-            {
-                num += (markers[i].img.lat - avgy) * (markers[i].geo.lon - avglon);
-                den += (markers[i].img.lat - avgy) * (markers[i].img.lat - avgy);
-            }
-        
-            var lonmy = num/den;
-            var lonby = avglon - (lonmy * avgy);
-            //alert([lonmy, lonby]);
-            
-            var estlon = function(x, y) { return lonmx * x + lonmy * y + (lonbx + lonby) / 2; }
-        
-            var num = 0;
-            var den = 0;
-            
-            for(var i in markers)
-            {
-                num += (markers[i].img.lon - avgx) * (markers[i].geo.lat - avglat);
-                den += (markers[i].img.lon - avgx) * (markers[i].img.lon - avgx);
-            }
-        
-            var latmx = num/den;
-            var latbx = avglat - (latmx * avgx);
-            //alert([latmx, latbx]);
-        
-            var num = 0;
-            var den = 0;
-            
-            for(var i in markers)
-            {
-                num += (markers[i].img.lat - avgy) * (markers[i].geo.lat - avglat);
-                den += (markers[i].img.lat - avgy) * (markers[i].img.lat - avgy);
-            }
-        
-            var latmy = num/den;
-            var latby = avglat - (latmy * avgy);
-            //alert([latmy, latby]);
-            
-            var estlat = function(x, y) { return latmx * x + latmy * y + (latbx + latby) / 2; }
-            
-            var c = canvas.getContext('2d');
-            var ul = new mm.Location(estlat(0, 0), estlon(0, 0));
-            var bl = new mm.Location(estlat(0, zoomify.bottomright.row), estlon(0, zoomify.bottomright.row));
-            var ur = new mm.Location(estlat(zoomify.bottomright.column, 0), estlon(zoomify.bottomright.column, 0));
-            var br = new mm.Location(estlat(zoomify.bottomright.column, zoomify.bottomright.row), estlon(zoomify.bottomright.column, zoomify.bottomright.row));
-            
-            c.save();
-            c.setTransform();
-            c.beginPath();
-            c.moveTo(combine.locationPoint(bl).x, combine.locationPoint(bl).y);
-            c.lineTo(combine.locationPoint(ul).x, combine.locationPoint(ul).y);
-            c.lineTo(combine.locationPoint(ur).x, combine.locationPoint(ur).y);
-            c.lineTo(combine.locationPoint(br).x, combine.locationPoint(br).y);
-            c.stroke();
-            c.restore();
-        }
-        
-        onMapChanged();
-    
     //-->
     </script>
 
