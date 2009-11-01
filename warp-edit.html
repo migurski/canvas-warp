@@ -5,6 +5,7 @@
 	<meta http-equiv="content-type" content="text/html; charset=utf-8">
 	<title>Canvas Warp Edit</title>
     <script src="modestmaps.js" type="text/javascript" language="javascript1.5"></script>
+    <script src="delaunay.js" type="text/javascript" language="javascript1.5"></script>
     <script src="zoomify.js" type="text/javascript" language="javascript1.5"></script>
     <style type="text/css" title="text/css">
     <!--
@@ -39,7 +40,7 @@
             this.img = img;
         }
         
-        var Follower = function(mesh, map, location)
+        var Follower = function(mesh, map, location, index)
         {
             this.map = map;
             this.mesh = mesh;
@@ -59,8 +60,11 @@
             this.div.style.width = '32px';
             this.div.style.height = '32px';
             this.div.style.cursor = 'pointer';
+            this.div.style.background = 'url("marker-centered.png")';
+            this.div.style.textAlign = 'center';
+            this.div.style.font = '11px/40px sans-serif';
             
-            this.div.innerHTML = '<img src="marker.png"/>';
+            //this.div.innerHTML = index.toString();
             
             this.div.onmousedown = function(e) { follower.onmousedown(e); };
             
@@ -181,15 +185,16 @@
         canvas.height = 390;
         combine.parent.appendChild(canvas);
         
-        var Mesh = function(picture, basemap, canvas, markers, triangles)
+        var Mesh = function(picture, basemap, canvas, markers)
         {
             this.canvas = canvas;
             this.picture = picture;
             this.basemap = basemap;
             this.markers = markers;
-            this.triangles = triangles;
             this.revision = 1;
-
+            
+            this.triangles = this.makeTriangles(markers);
+            
             var mesh = this;
             this.basemap.addCallback('zoomed',    function(m, a) { return mesh.draw(); });
             this.basemap.addCallback('centered',  function(m, a) { return mesh.draw(); });
@@ -198,8 +203,8 @@
             
             for(var i in markers)
             {
-                var f1 = new Follower(this, picture, markers[i].img);
-                var f2 = new Follower(this, basemap, markers[i].geo);
+                var f1 = new Follower(this, picture, markers[i].img, parseInt(i) + 1);
+                var f2 = new Follower(this, basemap, markers[i].geo, parseInt(i) + 1);
             }
         }
         
@@ -219,6 +224,69 @@
                 {
                     this.warpTo(this.triangles[i][0], this.triangles[i][1], this.triangles[i][2], this.revision);
                 }
+            },
+            
+            makeTriangles: function(markers)
+            {
+                var w = this.picture.provider.bottomright.column;
+                var h = this.picture.provider.bottomright.row;
+                
+                var supertriangle = [new mm.Point(-w/2, 0), new mm.Point(w * 3/2, 0), new mm.Point(w/2, h*2)];
+                var triangles = [supertriangle];
+                
+                for(var i in markers)
+                {
+                    var loc = markers[i].img;
+                    addPoint(new mm.Point(loc.lon, loc.lat), triangles);
+                }
+                
+                // delete triangles that touch the outside supertriangle
+                for(var i in triangles)
+                {
+                    var trim = false;
+                    
+                    for(var j in triangles[i])
+                    {
+                        for(var k in supertriangle)
+                        {
+                            if(supertriangle[k] == triangles[i][j])
+                            {
+                                trim = true;
+                                break;
+                            }
+                        }
+                        
+                        if(trim)
+                        {
+                            delete triangles[i];
+                            break;
+                        }
+                    }
+                }
+                
+                // replace each of the points in each triangle with an original marker
+                for(var i = 0; i < triangles.length; i += 1)
+                {
+                    if(triangles[i] == undefined)
+                    {
+                        triangles.splice(i, 1);
+                        i -= 1;
+                        continue;
+                    }
+                    
+                    for(var j in triangles[i])
+                    {
+                        for(var k in markers)
+                        {
+                            if(markers[k].img.lat == triangles[i][j].y && markers[k].img.lon == triangles[i][j].x)
+                            {
+                                triangles[i][j] = markers[k];
+                            }
+                        }
+                    }
+                }
+                
+                return triangles;
             },
             
             warpTo: function(m1, m2, m3, revision)
@@ -334,7 +402,7 @@
         var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Location(506, 2654)); // 17th & Oak
         var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Location(773, 1868)); // 20th & San Pablo
         
-        var m = new Mesh(picture, combine, canvas, [m1, m2, m3, m4, m5], [[m1, m2, m3], [m1, m4, m3], [m1, m2, m5]]);
+        var m = new Mesh(picture, combine, canvas, [m1, m2, m3, m4, m5]);
         m.draw();
         
     //-->
