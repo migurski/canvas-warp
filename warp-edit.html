@@ -193,9 +193,17 @@
             this.markers = markers;
             this.revision = 1;
             
-            this.triangles = this.makeTriangles(markers);
-            
+            var canvas = document.createElement('canvas');
+            canvas.style.position = 'absolute';
+            canvas.width = 550;
+            canvas.height = 390;
+            picture.parent.appendChild(canvas);
+
             var mesh = this;
+            this.picture.addCallback('zoomed',    function(m, a) { return mesh.draw(); });
+            this.picture.addCallback('centered',  function(m, a) { return mesh.draw(); });
+            this.picture.addCallback('extentset', function(m, a) { return mesh.draw(); });
+            this.picture.addCallback('panned',    function(m, a) { return mesh.draw(); });
             this.basemap.addCallback('zoomed',    function(m, a) { return mesh.draw(); });
             this.basemap.addCallback('centered',  function(m, a) { return mesh.draw(); });
             this.basemap.addCallback('extentset', function(m, a) { return mesh.draw(); });
@@ -213,16 +221,47 @@
             picture: null,
             basemap: null,
             markers: null,
-            triangles: null,
             
             draw: function()
             {
                 this.revision += 1;
                 this.canvas.getContext('2d').clearRect(0, 0, this.canvas.width, this.canvas.height);
+                var triangles = this.makeTriangles(this.markers);
                 
-                for(var i in this.triangles)
+                var c;
+                
+                for(var node = this.picture.parent.lastChild; node; node = node.previousSibling)
                 {
-                    this.warpTo(this.triangles[i][0], this.triangles[i][1], this.triangles[i][2], this.revision);
+                    if(node.tagName.toLowerCase() == 'canvas')
+                    {
+                        c = node.getContext('2d');
+                        c.clearRect(0, 0, node.width, node.height);
+                        break;
+                    }
+                }
+                
+                for(var i in triangles)
+                {
+                    this.warpTo(triangles[i][0], triangles[i][1], triangles[i][2], this.revision);
+                    
+                    if(c)
+                    {
+                        var p1 = this.picture.locationPoint(triangles[i][0].img);
+                        var p2 = this.picture.locationPoint(triangles[i][1].img);
+                        var p3 = this.picture.locationPoint(triangles[i][2].img);
+                        
+                        c.save();
+                        c.setTransform();
+                        c.beginPath();
+                        c.moveTo(p1.x, p1.y);
+                        c.lineTo(p2.x, p2.y);
+                        c.lineTo(p3.x, p3.y);
+                        c.lineTo(p1.x, p1.y);
+                        c.closePath();
+                        c.strokeStyle = 'red';
+                        c.stroke();
+                        c.restore();
+                    }
                 }
             },
             
