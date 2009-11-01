@@ -986,12 +986,12 @@ com.modestmaps.Map.prototype = {
                         var ty = ((this.dimensions.y/2) + (tile.coord.row - theCoord.row) * this.provider.tileHeight * scale);
                         tile.style.left = parseInt(tx) + 'px'; 
                         tile.style.top = parseInt(ty) + 'px'; 
-                        tile.width = this.provider.tileWidth * scale;
-                        tile.height = this.provider.tileHeight * scale;
+                        //tile.width = this.provider.tileWidth * scale;
+                        //tile.height = this.provider.tileHeight * scale;
                     }
                     else {
-                        tile.width = this.provider.tileWidth;
-                        tile.height = this.provider.tileHeight;                    
+                        //tile.width = this.provider.tileWidth;
+                        //tile.height = this.provider.tileHeight;                    
                     }
                 }
             }
@@ -1036,8 +1036,8 @@ com.modestmaps.Map.prototype = {
         if (!this.requestedTiles[tileKey]) {
             var tile = document.createElement('img'); // TODO: benchmark vs new Image() (in all browsers)
             tile.id = tileKey;
-            tile.width = this.provider.tileWidth;
-            tile.height = this.provider.tileHeight;
+            //tile.width = this.provider.tileWidth;
+            //tile.height = this.provider.tileHeight;
             tile.style.position = 'absolute';
             this.requestedTiles[tileKey] = tile;
             this.requestQueue.push( { tile: tile, coord: tileCoord.copy() });
