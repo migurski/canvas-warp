@@ -33,10 +33,10 @@
     
         var mm = com.modestmaps;
         
-        var Marker = function(location, point)
+        var Marker = function(geo, img)
         {
-            this.location = location;
-            this.point = point;
+            this.geo = geo;
+            this.img = img;
         }
         
         var Follower = function(map, location)
@@ -178,26 +178,33 @@
         canvas.width = 550;
         canvas.height = 390;
         combine.parent.appendChild(canvas);
-
-        var m1 = new Marker(new mm.Location(37.808055, -122.264507), new mm.Point(2296, 465)); // 20th & Harrison
-        var m2 = new Marker(new mm.Location(37.802036, -122.269700), new mm.Point(2480, 982)); // 12th & Webster
-        var m3 = new Marker(new mm.Location(37.799730, -122.263756), new mm.Point(2812, 813)); // 12th & Oak
-        var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Point(2654, 506)); // 17th & Oak
-        var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Point(1868, 773)); // 20th & San Pablo
         
-        var f = new Follower(combine, m1.location);
+        var Mesh = function(picture, basemap, markers)
+        {
+            this.picture = picture;
+            this.basemap = basemap;
+            this.markers = markers;
+        }
+
+        var m1 = new Marker(new mm.Location(37.808055, -122.264507), new mm.Location(465, 2296)); // 20th & Harrison
+        var m2 = new Marker(new mm.Location(37.802036, -122.269700), new mm.Location(982, 2480)); // 12th & Webster
+        var m3 = new Marker(new mm.Location(37.799730, -122.263756), new mm.Location(813, 2812)); // 12th & Oak
+        var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Location(506, 2654)); // 17th & Oak
+        var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Location(773, 1868)); // 20th & San Pablo
+        
+        var f = new Follower(combine, m1.geo);
         
         function warpTo(zoomifyProvider, destinationMap, canvas, m1, m2, m3, revision)
         {
             // pixel positions of triangle corners
-            var p1 = destinationMap.locationPoint(m1.location);
-            var p2 = destinationMap.locationPoint(m2.location);
-            var p3 = destinationMap.locationPoint(m3.location);
+            var p1 = destinationMap.locationPoint(m1.geo);
+            var p2 = destinationMap.locationPoint(m2.geo);
+            var p3 = destinationMap.locationPoint(m3.geo);
             
             // coordinates of triangle corners
-            var c1 = new mm.Coordinate(m1.point.y, m1.point.x, zoomifyProvider.bottomright.zoom);
-            var c2 = new mm.Coordinate(m2.point.y, m2.point.x, zoomifyProvider.bottomright.zoom);
-            var c3 = new mm.Coordinate(m3.point.y, m3.point.x, zoomifyProvider.bottomright.zoom);
+            var c1 = new mm.Coordinate(m1.img.lat, m1.img.lon, zoomifyProvider.bottomright.zoom);
+            var c2 = new mm.Coordinate(m2.img.lat, m2.img.lon, zoomifyProvider.bottomright.zoom);
+            var c3 = new mm.Coordinate(m3.img.lat, m3.img.lon, zoomifyProvider.bottomright.zoom);
             
             // transformation from image pixel space to html pixel space
             var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
@@ -279,7 +286,6 @@
                     c.lineTo(tile.triangle[0], tile.triangle[1]);
                     c.closePath();
                     c.clip();
-                    c.globalAlpha = .65;
                     c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
                     c.restore();
 
@@ -311,10 +317,10 @@
             
             for(var i = 0; i < markers.length; i += 1)
             {
-                avglat = ((j * avglat) + markers[i].location.lat) / (j + 1);
-                avglon = ((j * avglon) + markers[i].location.lon) / (j + 1);
-                avgx = ((j * avgx) + markers[i].point.x) / (j + 1);
-                avgy = ((j * avgy) + markers[i].point.y) / (j + 1);
+                avglat = ((j * avglat) + markers[i].geo.lat) / (j + 1);
+                avglon = ((j * avglon) + markers[i].geo.lon) / (j + 1);
+                avgx = ((j * avgx) + markers[i].img.lon) / (j + 1);
+                avgy = ((j * avgy) + markers[i].img.lat) / (j + 1);
                 j += 1;
             }
             
@@ -325,8 +331,8 @@
             
             for(var i in markers)
             {
-                num += (markers[i].point.x - avgx) * (markers[i].location.lon - avglon);
-                den += (markers[i].point.x - avgx) * (markers[i].point.x - avgx);
+                num += (markers[i].img.lon - avgx) * (markers[i].geo.lon - avglon);
+                den += (markers[i].img.lon - avgx) * (markers[i].img.lon - avgx);
             }
         
             var lonmx = num/den;
@@ -338,8 +344,8 @@
             
             for(var i in markers)
             {
-                num += (markers[i].point.y - avgy) * (markers[i].location.lon - avglon);
-                den += (markers[i].point.y - avgy) * (markers[i].point.y - avgy);
+                num += (markers[i].img.lat - avgy) * (markers[i].geo.lon - avglon);
+                den += (markers[i].img.lat - avgy) * (markers[i].img.lat - avgy);
             }
         
             var lonmy = num/den;
@@ -353,8 +359,8 @@
             
             for(var i in markers)
             {
-                num += (markers[i].point.x - avgx) * (markers[i].location.lat - avglat);
-                den += (markers[i].point.x - avgx) * (markers[i].point.x - avgx);
+                num += (markers[i].img.lon - avgx) * (markers[i].geo.lat - avglat);
+                den += (markers[i].img.lon - avgx) * (markers[i].img.lon - avgx);
             }
         
             var latmx = num/den;
@@ -366,8 +372,8 @@
             
             for(var i in markers)
             {
-                num += (markers[i].point.y - avgy) * (markers[i].location.lat - avglat);
-                den += (markers[i].point.y - avgy) * (markers[i].point.y - avgy);
+                num += (markers[i].img.lat - avgy) * (markers[i].geo.lat - avglat);
+                den += (markers[i].img.lat - avgy) * (markers[i].img.lat - avgy);
             }
         
             var latmy = num/den;
