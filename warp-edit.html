@@ -9,7 +9,7 @@
     <script src="zoomify.js" type="text/javascript" language="javascript1.5"></script>
     <style type="text/css" title="text/css">
     <!--
-        body { background-color: #bbb; }
+        body { background-color: #bbb; margin: 15px; }
 
         .map
         {
@@ -17,14 +17,18 @@
         	background-color: #ccc;
         	width: 550px;
         	height: 450px;
-        	margin: 0 1em 1em 0;
-        	float: left;
+        	position: absolute !important;
+        	left: 15px;
+        	top: 45px;
         }
+        
+        #combine { left: 580px; }
         
         #output
         {
-            clear: both;
-        	margin: 0 1em 1em 0;
+        	position: absolute !important;
+        	left: 15px;
+        	top: 510px;
         	white-space: pre-wrap;
         	font: 11px/13px monospace;
         }
@@ -33,10 +37,14 @@
 </head>
 <body>
 
+    <p>
+        There's a <a href="http://mike.teczno.com/notes/canvas-warp.html">blog post that explains all this</a>.
+    </p>
+    
     <div id="picture" class="map"></div>
     <!--<div id="basemap" class="map"></div>-->
     <div id="combine" class="map"></div>
-    
+
     <div id="output"></div>
 
     <script type="text/javascript" language="javascript1.5">
