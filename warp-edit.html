@@ -16,9 +16,17 @@
         	border: 1px solid black;
         	background-color: #ccc;
         	width: 550px;
-        	height: 390px;
+        	height: 450px;
         	margin: 0 1em 1em 0;
         	float: left;
+        }
+        
+        #output
+        {
+            clear: both;
+        	margin: 0 1em 1em 0;
+        	white-space: pre-wrap;
+        	font: 11px/13px monospace;
         }
     -->
     </style>
@@ -28,6 +36,8 @@
     <div id="picture" class="map"></div>
     <!--<div id="basemap" class="map"></div>-->
     <div id="combine" class="map"></div>
+    
+    <div id="output"></div>
 
     <script type="text/javascript" language="javascript1.5">
     <!--
@@ -150,7 +160,7 @@
                 this.location.lat = loc.lat;
                 this.location.lon = loc.lon;
                 this.draw();
-                this.mesh.draw();
+                this.mesh.draw(true);
             },
             
             onmouseup: function(e)
@@ -163,26 +173,22 @@
             }
         };
 
-        var zoomify = new ZoomifyProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670);
+        //var zoomify = new ZoomifyProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670);
+        var zoomify = new ZoomifyProvider('http://s3.amazonaws.com/canvas-warp/pages-12-13_img', 11946, 5670);
 
-        var picture = new mm.Map('picture', zoomify, new mm.Point(550, 390))
-        picture.setCenterZoom(new mm.Location(559, 2563), 5);
+        var picture = new mm.Map('picture', zoomify, new mm.Point(550, 450))
+        picture.setCenterZoom(new mm.Location(815, 2223), 4);
         picture.draw();
 
-        /*
-        var basemap = new mm.Map('basemap', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
-        basemap.setCenterZoom(new mm.Location(37.805, -122.263), 15);
-        basemap.draw();
-        */
-
-        var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 390))
-        combine.setCenterZoom(new mm.Location(37.805, -122.263), 15);
+        var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 450))
+        combine.setCenterZoom(new mm.Location(37.8061189, -122.2701883), 15);
         combine.draw();
         
         var canvas = document.createElement('canvas');
         canvas.style.position = 'absolute';
+        canvas.style.opacity = 0.65;
         canvas.width = 550;
-        canvas.height = 390;
+        canvas.height = 450;
         combine.parent.appendChild(canvas);
         
         var Mesh = function(picture, basemap, canvas, markers)
@@ -196,18 +202,18 @@
             var canvas = document.createElement('canvas');
             canvas.style.position = 'absolute';
             canvas.width = 550;
-            canvas.height = 390;
+            canvas.height = 450;
             picture.parent.appendChild(canvas);
 
             var mesh = this;
-            this.picture.addCallback('zoomed',    function(m, a) { return mesh.draw(); });
-            this.picture.addCallback('centered',  function(m, a) { return mesh.draw(); });
-            this.picture.addCallback('extentset', function(m, a) { return mesh.draw(); });
-            this.picture.addCallback('panned',    function(m, a) { return mesh.draw(); });
-            this.basemap.addCallback('zoomed',    function(m, a) { return mesh.draw(); });
-            this.basemap.addCallback('centered',  function(m, a) { return mesh.draw(); });
-            this.basemap.addCallback('extentset', function(m, a) { return mesh.draw(); });
-            this.basemap.addCallback('panned',    function(m, a) { return mesh.draw(); });
+            this.picture.addCallback('zoomed',    function(m, a) { return mesh.draw(false); });
+            this.picture.addCallback('centered',  function(m, a) { return mesh.draw(false); });
+            this.picture.addCallback('extentset', function(m, a) { return mesh.draw(false); });
+            this.picture.addCallback('panned',    function(m, a) { return mesh.draw(false); });
+            this.basemap.addCallback('zoomed',    function(m, a) { return mesh.draw(true); });
+            this.basemap.addCallback('centered',  function(m, a) { return mesh.draw(true); });
+            this.basemap.addCallback('extentset', function(m, a) { return mesh.draw(true); });
+            this.basemap.addCallback('panned',    function(m, a) { return mesh.draw(true); });
             
             for(var i in markers)
             {
@@ -222,10 +228,14 @@
             basemap: null,
             markers: null,
             
-            draw: function()
+            draw: function(updatePicture)
             {
-                this.revision += 1;
-                this.canvas.getContext('2d').clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if(updatePicture)
+                {
+                    this.revision += 1;
+                    this.canvas.getContext('2d').clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+
                 var triangles = this.makeTriangles(this.markers);
                 
                 var c;
@@ -242,7 +252,10 @@
                 
                 for(var i in triangles)
                 {
-                    this.warpTo(triangles[i][0], triangles[i][1], triangles[i][2], this.revision);
+                    if(updatePicture)
+                    {
+                        this.warpTo(triangles[i][0], triangles[i][1], triangles[i][2], this.revision);
+                    }
                     
                     if(c)
                     {
@@ -251,7 +264,7 @@
                         var p3 = this.picture.locationPoint(triangles[i][2].img);
                         
                         c.save();
-                        c.setTransform();
+                        c.setTransform(1, 0, 0, 1, 0, 0);
                         c.beginPath();
                         c.moveTo(p1.x, p1.y);
                         c.lineTo(p2.x, p2.y);
@@ -262,6 +275,21 @@
                         c.stroke();
                         c.restore();
                     }
+                }
+                
+                var output = document.getElementById('output');
+                
+                if(output)
+                {
+                    var ms = [];
+                    
+                    for(var i in this.markers)
+                    {
+                        var m = this.markers[i];
+                        ms.push('  {"img": [' + m.img.lon.toFixed(0) + ', ' + m.img.lat.toFixed(0) + '], "geo": [' + m.geo.lat.toFixed(7) + ', ' + m.geo.lon.toFixed(7) + ']}');
+                    }
+                    
+                    output.innerHTML = '// markers\n[\n' + ms.join(',\n') + '\n]';
                 }
             },
             
@@ -434,15 +462,23 @@
             }
         
         };
-
-        var m1 = new Marker(new mm.Location(37.808055, -122.264507), new mm.Location(465, 2296)); // 20th & Harrison
-        var m2 = new Marker(new mm.Location(37.802036, -122.269700), new mm.Location(982, 2480)); // 12th & Webster
-        var m3 = new Marker(new mm.Location(37.799730, -122.263756), new mm.Location(813, 2812)); // 12th & Oak
-        var m4 = new Marker(new mm.Location(37.803715, -122.261197), new mm.Location(506, 2654)); // 17th & Oak
-        var m5 = new Marker(new mm.Location(37.810174, -122.273176), new mm.Location(773, 1868)); // 20th & San Pablo
         
-        var m = new Mesh(picture, combine, canvas, [m1, m2, m3, m4, m5]);
-        m.draw();
+        var markers = [
+          {"img": [2162, 191], "geo": [37.8115015, -122.2620666]},
+          {"img": [1815, 1326], "geo": [37.8066021, -122.2816360]},
+          {"img": [2821, 817], "geo": [37.7995492, -122.2636974]},
+          {"img": [2658, 438], "geo": [37.8041608, -122.2601998]},
+          {"img": [1439, 836], "geo": [37.8146037, -122.2786963]}
+        ];
+        
+        for(var i in markers)
+        {
+            var m = markers[i];
+            markers[i] = new Marker(new mm.Location(m.geo[0], m.geo[1]), new mm.Location(m.img[1], m.img[0]));
+        }
+        
+        var mesh = new Mesh(picture, combine, canvas, markers);
+        mesh.draw(true);
         
     //-->
     </script>
