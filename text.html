@@ -1,0 +1,68 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Canvas Text</title>
+    <style type="text/css" title="text/css">
+    <!--
+        body { background-color: #bbb; }
+        #c { border: 1px solid black; background-color: #ccc; }
+    -->
+    </style>
+</head>
+<body>
+    <canvas id="c" width="650" height="390"></canvas>
+    <script type="text/javascript" language="javascript1.5">
+    <!--
+        
+        var c = document.getElementById('c').getContext('2d');
+        var w = document.getElementById('c').width;
+        var h = document.getElementById('c').height;
+        
+        c.translate(100, 100);
+        c.rotate(10 * Math.PI/180);
+        c.scale(2, 2);
+        //c.transform(6, 0, 0, 6, 100, 100);
+        c.font = '36px Helvetica';
+        
+        c.save();
+        var msg = 'Hello World';
+        
+        c.fillStyle = '#ddd';
+        c.fillText(msg, 0, 0);
+
+        for(var i = 0; i < msg.length; i += 1)
+        {
+            c.fillStyle = '#bbb';
+            c.fillText(msg[i], 0, 0);
+            
+            c.beginPath();
+            c.rect(0, 0, c.measureText(msg[i]).width, -36);
+            c.strokeStyle = '#999';
+            c.stroke();
+            
+            c.translate(c.measureText(msg[i]).width, 0);
+        }
+        
+        /*
+        c.beginPath();
+        c.rect(0, 0, c.measureText("Hello World").width + c.measureText("!").width + c.measureText("!").width + c.measureText("!").width, -12);
+        c.closePath();
+        c.fillStyle = 'white';
+        c.fill();
+
+        c.beginPath();
+        c.rect(0, 0, c.measureText("Hello World!!!").width, 2);
+        c.closePath();
+        c.fillStyle = 'red';
+        c.fill();
+
+        c.fillStyle = 'black';
+        c.fillText("Hello World!!!", 0, 0);
+        */
+        
+    //-->
+    </script>
+</body>
+</html>
