@@ -1,0 +1,496 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Canvas Warp NYPL</title>
+    <script src="modestmaps.js" type="text/javascript" language="javascript1.5"></script>
+    <script src="delaunay.js" type="text/javascript" language="javascript1.5"></script>
+    <script src="wms.js" type="text/javascript" language="javascript1.5"></script>
+    <style type="text/css" title="text/css">
+    <!--
+        body { background-color: #bbb; margin: 15px; }
+
+        .map
+        {
+        	border: 1px solid black;
+        	background-color: #ccc;
+        	width: 550px;
+        	height: 450px;
+        	position: absolute !important;
+        	left: 15px;
+        	top: 45px;
+        }
+        
+        #combine { left: 580px; }
+        
+        #output
+        {
+        	position: absolute !important;
+        	left: 15px;
+        	top: 510px;
+        	white-space: pre-wrap;
+        	font: 11px/13px monospace;
+        }
+    -->
+    </style>
+</head>
+<body>
+
+    <p>
+        There's a <a href="http://mike.teczno.com/notes/canvas-warp.html">blog post that explains all this</a>.
+    </p>
+    
+    <div id="picture" class="map"></div>
+    <!--<div id="basemap" class="map"></div>-->
+    <div id="combine" class="map"></div>
+
+    <div id="output"></div>
+
+    <script type="text/javascript" language="javascript1.5">
+    <!--
+    
+        var mm = com.modestmaps;
+        
+        var Marker = function(geo, img)
+        {
+            this.geo = geo;
+            this.img = img;
+        }
+        
+        var Follower = function(mesh, map, location, index)
+        {
+            this.map = map;
+            this.mesh = mesh;
+            this.location = location;
+            this.coord = map.provider.locationCoordinate(location);
+            
+            var follower = this;
+            
+            var zoomedCallback = function(m, a) { return follower.zoomed(m); };
+            map.addCallback('zoomed', zoomedCallback);
+            map.addCallback('centered', zoomedCallback);
+            map.addCallback('extentset', zoomedCallback);
+            map.addCallback('panned', function(m, a) { return follower.draw(); });
+            
+            this.div = document.createElement('div');
+            this.div.style.position = 'absolute';
+            this.div.style.width = '32px';
+            this.div.style.height = '32px';
+            this.div.style.cursor = 'pointer';
+            this.div.style.background = 'url("marker-centered.png")';
+            this.div.style.textAlign = 'center';
+            this.div.style.font = '11px/40px sans-serif';
+            
+            //this.div.innerHTML = index.toString();
+            
+            this.div.onmousedown = function(e) { follower.onmousedown(e); };
+            
+            map.parent.appendChild(this.div);
+            
+            this.draw();
+        }
+        
+        Follower.prototype = {
+        
+            map: null,
+            div: null,
+            mesh: null,
+            coord: null,
+            location: null,
+            
+            zoomed: function(map)
+            {
+                this.coord = this.coord.zoomTo(map.coordinate.zoom);
+                this.draw(map);
+            },
+        
+            draw: function()
+            {
+                try {
+                    var point = this.map.coordinatePoint(this.coord);
+        
+                } catch(e) {
+                    // too soon?
+                    return;
+                }
+                
+                if(point.x < 0) {
+                    // too far left
+                    this.div.style.display = 'none';
+                
+                } else if(point.y < 0) {
+                    // too far up
+                    this.div.style.display = 'none';
+                
+                } else if(point.x > this.map.dimensions.x) {
+                    // too far right
+                    this.div.style.display = 'none';
+                
+                } else if(point.y > this.map.dimensions.y) {
+                    // too far down
+                    this.div.style.display = 'none';
+        
+                } else {
+                    this.div.style.display = 'block';
+                    this.div.style.left = point.x - 16 + 'px';
+                    this.div.style.top = point.y - 16 + 'px';
+                }
+            },
+            
+            onmousedown: function(e)
+            {
+                e.cancelBubble = true;
+                if (e.stopPropagation) e.stopPropagation();
+
+                var follower = this;
+                this.div.ondragstart = function(e) { return false; };
+                document.onmousemove = function(e) { follower.onmousemove(e) };
+                document.onmouseup = function(e) { follower.onmouseup(e) };
+            },
+            
+            onmousemove: function(e)
+            {
+                e.cancelBubble = true;
+                if (e.stopPropagation) e.stopPropagation();
+
+                var x = e.clientX;
+                var y = e.clientY - 8;
+                
+                for(var node = this.map.parent; node; node = node.offsetParent)
+                {
+                    x -= node.offsetLeft;
+                    y -= node.offsetTop;
+                }
+                
+                var loc = this.map.pointLocation(new mm.Point(x, y));
+                this.coord = this.map.provider.locationCoordinate(loc);
+                this.location.lat = loc.lat;
+                this.location.lon = loc.lon;
+                this.draw();
+                this.mesh.draw(true);
+            },
+            
+            onmouseup: function(e)
+            {
+                e.cancelBubble = true;
+                if (e.stopPropagation) e.stopPropagation();
+
+                document.onmousemove = null;
+                document.onmouseup = null;
+            }
+        };
+
+        //var zoomify = new WMSProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670);
+        var zoomify = new WMSProvider('http://dev.maps.nypl.org/warper/mapscans/wms/7371', 5099, 4071);
+
+        var picture = new mm.Map('picture', zoomify, new mm.Point(550, 450))
+        picture.setCenterZoom(new mm.Location(1500, 2500), 2);
+        picture.draw();
+
+        var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 450))
+        combine.setCenterZoom(new mm.Location(43.349, -76.152), 9);
+        combine.draw();
+        
+        var canvas = document.createElement('canvas');
+        canvas.style.position = 'absolute';
+        canvas.style.opacity = 0.65;
+        canvas.width = 550;
+        canvas.height = 450;
+        combine.parent.appendChild(canvas);
+        
+        var Mesh = function(picture, basemap, canvas, markers)
+        {
+            this.canvas = canvas;
+            this.picture = picture;
+            this.basemap = basemap;
+            this.markers = markers;
+            this.revision = 1;
+            
+            var canvas = document.createElement('canvas');
+            canvas.style.position = 'absolute';
+            canvas.width = 550;
+            canvas.height = 450;
+            picture.parent.appendChild(canvas);
+
+            var mesh = this;
+            this.picture.addCallback('zoomed',    function(m, a) { return mesh.draw(false); });
+            this.picture.addCallback('centered',  function(m, a) { return mesh.draw(false); });
+            this.picture.addCallback('extentset', function(m, a) { return mesh.draw(false); });
+            this.picture.addCallback('panned',    function(m, a) { return mesh.draw(false); });
+            this.basemap.addCallback('zoomed',    function(m, a) { return mesh.draw(true); });
+            this.basemap.addCallback('centered',  function(m, a) { return mesh.draw(true); });
+            this.basemap.addCallback('extentset', function(m, a) { return mesh.draw(true); });
+            this.basemap.addCallback('panned',    function(m, a) { return mesh.draw(true); });
+            
+            for(var i in markers)
+            {
+                var f1 = new Follower(this, picture, markers[i].img, parseInt(i) + 1);
+                var f2 = new Follower(this, basemap, markers[i].geo, parseInt(i) + 1);
+            }
+        }
+        
+        Mesh.prototype = {
+        
+            picture: null,
+            basemap: null,
+            markers: null,
+            
+            draw: function(updatePicture)
+            {
+                if(updatePicture)
+                {
+                    this.revision += 1;
+                    this.canvas.getContext('2d').clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+
+                var triangles = this.makeTriangles(this.markers);
+                
+                var c;
+                
+                for(var node = this.picture.parent.lastChild; node; node = node.previousSibling)
+                {
+                    if(node.tagName.toLowerCase() == 'canvas')
+                    {
+                        c = node.getContext('2d');
+                        c.clearRect(0, 0, node.width, node.height);
+                        break;
+                    }
+                }
+                
+                for(var i in triangles)
+                {
+                    if(updatePicture)
+                    {
+                        this.warpTo(triangles[i][0], triangles[i][1], triangles[i][2], this.revision);
+                    }
+                    
+                    if(c)
+                    {
+                        var p1 = this.picture.locationPoint(triangles[i][0].img);
+                        var p2 = this.picture.locationPoint(triangles[i][1].img);
+                        var p3 = this.picture.locationPoint(triangles[i][2].img);
+                        
+                        c.save();
+                        c.setTransform(1, 0, 0, 1, 0, 0);
+                        c.beginPath();
+                        c.moveTo(p1.x, p1.y);
+                        c.lineTo(p2.x, p2.y);
+                        c.lineTo(p3.x, p3.y);
+                        c.lineTo(p1.x, p1.y);
+                        c.closePath();
+                        c.strokeStyle = 'red';
+                        c.stroke();
+                        c.restore();
+                    }
+                }
+                
+                var output = document.getElementById('output');
+                
+                if(output)
+                {
+                    var ms = [];
+                    
+                    for(var i in this.markers)
+                    {
+                        var m = this.markers[i];
+                        ms.push('  {"img": [' + m.img.lon.toFixed(0) + ', ' + m.img.lat.toFixed(0) + '], "geo": [' + m.geo.lat.toFixed(7) + ', ' + m.geo.lon.toFixed(7) + ']}');
+                    }
+                    
+                    output.innerHTML = '// markers\n[\n' + ms.join(',\n') + '\n]';
+                }
+            },
+            
+            makeTriangles: function(markers)
+            {
+                var w = this.picture.provider.bottomright.column;
+                var h = this.picture.provider.bottomright.row;
+                
+                var supertriangle = [new mm.Point(-w/2, 0), new mm.Point(w * 3/2, 0), new mm.Point(w/2, h*2)];
+                var triangles = [supertriangle];
+                
+                for(var i in markers)
+                {
+                    var loc = markers[i].img;
+                    addPoint(new mm.Point(loc.lon, loc.lat), triangles);
+                }
+                
+                // delete triangles that touch the outside supertriangle
+                for(var i in triangles)
+                {
+                    var trim = false;
+                    
+                    for(var j in triangles[i])
+                    {
+                        for(var k in supertriangle)
+                        {
+                            if(supertriangle[k] == triangles[i][j])
+                            {
+                                trim = true;
+                                break;
+                            }
+                        }
+                        
+                        if(trim)
+                        {
+                            delete triangles[i];
+                            break;
+                        }
+                    }
+                }
+                
+                // replace each of the points in each triangle with an original marker
+                for(var i = 0; i < triangles.length; i += 1)
+                {
+                    if(triangles[i] == undefined)
+                    {
+                        triangles.splice(i, 1);
+                        i -= 1;
+                        continue;
+                    }
+                    
+                    for(var j in triangles[i])
+                    {
+                        for(var k in markers)
+                        {
+                            if(markers[k].img.lat == triangles[i][j].y && markers[k].img.lon == triangles[i][j].x)
+                            {
+                                triangles[i][j] = markers[k];
+                            }
+                        }
+                    }
+                }
+                
+                return triangles;
+            },
+            
+            warpTo: function(m1, m2, m3, revision)
+            {
+                // pixel positions of triangle corners
+                var p1 = this.basemap.locationPoint(m1.geo);
+                var p2 = this.basemap.locationPoint(m2.geo);
+                var p3 = this.basemap.locationPoint(m3.geo);
+                
+                // coordinates of triangle corners
+                var c1 = new mm.Coordinate(m1.img.lat, m1.img.lon, this.picture.provider.bottomright.zoom);
+                var c2 = new mm.Coordinate(m2.img.lat, m2.img.lon, this.picture.provider.bottomright.zoom);
+                var c3 = new mm.Coordinate(m3.img.lat, m3.img.lon, this.picture.provider.bottomright.zoom);
+                
+                // transformation from image pixel space to html pixel space
+                var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
+                //alert([t.ax, t.bx, t.cx, t.ay, t.by, t.cy]);
+                
+                // get the best resampled zoom level from the image pyramid
+                var sx = Math.sqrt(Math.pow(t.ax, 2) + Math.pow(t.bx, 2));
+                var sy = Math.sqrt(Math.pow(t.ay, 2) + Math.pow(t.by, 2));
+                var s = Math.max(sx, sy); //(sx + sy) / 2;
+                var z = this.picture.provider.bottomright.zoom + Math.min(0, Math.round(Math.log(s) / Math.LN2));
+                //alert(['native zoom level', z, Math.min(0, Math.round(Math.log(s) / Math.LN2)), this.picture.provider.bottomright.zoom].join('\n'));
+                
+                // pixel space zoom-corrected coordinates of triangle corners
+                c1 = c1.zoomTo(z);
+                c2 = c2.zoomTo(z);
+                c3 = c3.zoomTo(z);
+        
+                // do this again at the corrected zoom
+                var t = mm.Transformation.prototype.deriveTransformation(c1.column, c1.row, p1.x, p1.y, c2.column, c2.row, p2.x, p2.y, c3.column, c3.row, p3.x, p3.y);
+                //alert(['pixel space transform', t.ax, t.bx, t.cx, t.ay, t.by, t.cy].join('\n'));
+                
+                // for later, in pixel space
+                var triangle = [c1.column, c1.row, c2.column, c2.row, c3.column, c3.row];
+                var transform = [t.ax, t.ay, t.bx, t.by, t.cx, t.cy];
+        
+                // tile space zoom-corrected coordinates of triangle corners
+                c1 = c1.zoomBy(-8);
+                c2 = c2.zoomBy(-8);
+                c3 = c3.zoomBy(-8);
+        
+                var minrow = Math.min(c1.row, c2.row, c3.row);
+                var maxrow = Math.max(c1.row, c2.row, c3.row);
+                var mincol = Math.min(c1.column, c2.column, c3.column);
+                var maxcol = Math.max(c1.column, c2.column, c3.column);
+        
+                var ul = new mm.Coordinate(minrow, mincol, c1.zoom).container();
+                var br = new mm.Coordinate(maxrow, maxcol, c1.zoom).container();
+                
+                //alert(['boundaries of triangle', minrow, mincol, maxrow, maxcol, ul, br].join('\n'));
+                
+                var tiles = [];
+                
+                for(var row = ul.row; row <= br.row; row += 1)
+                {
+                    for(var col = ul.column; col <= br.column; col += 1)
+                    {
+                        var tile = new mm.Coordinate(row, col, ul.zoom);
+                        var offset = new mm.Point(tile.zoomBy(8).column, tile.zoomBy(8).row);
+                        var url = this.picture.provider.getTileUrl(tile);
+                        
+                        tiles.push({tile: tile, offset: offset, url: url, transform: transform, triangle: triangle});
+                    }
+                }
+                
+                //alert('Drawing ' + tiles.length + ' tiles');
+                this.drawTiles(tiles, revision);
+            },
+            
+            drawTiles: function(tiles, revision)
+            {
+                var mesh = this;
+                var c = this.canvas.getContext('2d');
+
+                if(tiles.length)
+                {
+                    var tile = tiles.shift();
+                    var img = new Image();
+                    
+                    img.onload = function()
+                    {
+                        if(mesh.revision != revision)
+                        {
+                            return;
+                        }
+            
+                        c.save();
+                        c.setTransform(tile.transform[0], tile.transform[1], tile.transform[2], tile.transform[3], tile.transform[4], tile.transform[5]);
+                        c.beginPath();
+                        c.moveTo(tile.triangle[0], tile.triangle[1]);
+                        c.lineTo(tile.triangle[2], tile.triangle[3]);
+                        c.lineTo(tile.triangle[4], tile.triangle[5]);
+                        c.lineTo(tile.triangle[0], tile.triangle[1]);
+                        c.closePath();
+                        c.clip();
+                        c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
+                        c.restore();
+    
+                        mesh.drawTiles(tiles, revision);
+                    }
+                    
+                    img.src = tile.url;
+                }
+            }
+        
+        };
+        
+        // markers
+        var markers = [
+          {"img": [3076, 196], "geo": [43.5295365, -76.6413942]},
+          {"img": [1340, 2980], "geo": [43.1620200, -75.7254091]},
+          {"img": [3852, 2980], "geo": [43.7333019, -75.7295290]},
+          {"img": [3780, 1372], "geo": [43.7204007, -76.2403932]},
+          {"img": [1380, 196], "geo": [43.1860563, -76.6249147]}
+        ];
+        
+        for(var i in markers)
+        {
+            var m = markers[i];
+            markers[i] = new Marker(new mm.Location(m.geo[0], m.geo[1]), new mm.Location(m.img[1], m.img[0]));
+        }
+        
+        var mesh = new Mesh(picture, combine, canvas, markers);
+        mesh.draw(true);
+        
+    //-->
+    </script>
+
+</body>
+</html>
