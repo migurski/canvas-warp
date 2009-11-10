@@ -73,20 +73,65 @@
             map.addCallback('extentset', zoomedCallback);
             map.addCallback('panned', function(m, a) { return follower.draw(); });
             
-            this.div = document.createElement('div');
-            this.div.style.position = 'absolute';
-            this.div.style.width = '32px';
-            this.div.style.height = '32px';
-            this.div.style.cursor = 'pointer';
-            this.div.style.background = 'url("marker-centered.png")';
-            this.div.style.textAlign = 'center';
-            this.div.style.font = '11px/40px sans-serif';
+            this.element = document.createElement('canvas');
+            this.element.width = '32';
+            this.element.height = '32';
+            this.element.style.width = '32px';
+            this.element.style.height = '32px';
+            this.element.style.position = 'absolute';
+            this.element.style.cursor = 'pointer';
             
-            //this.div.innerHTML = index.toString();
+            var c = this.element.getContext('2d');
             
-            this.div.onmousedown = function(e) { follower.onmousedown(e); };
+            c.save();
+            c.globalAlpha = 0.1;
+            c.beginPath();
+            c.arc(16, 16, 16, 0, Math.PI * 2, true);
+            c.arc(16, 16, 14, 0, Math.PI * 2, false);
+            c.closePath();
+            c.fillStyle = 'black';
+            c.fill();
+            c.beginPath();
+            c.arc(16, 16, 14, 0, Math.PI * 2, true);
+            c.closePath();
+            c.fillStyle = 'white';
+            c.fill();
+            c.restore();
             
-            map.parent.appendChild(this.div);
+            c.save();
+            c.globalAlpha = 1;
+            c.beginPath();
+            c.rect(15, 15, 1, 1);
+            c.rect(16, 16, 1, 1);
+            c.closePath();
+            c.fillStyle = 'black';
+            c.fill();
+            c.beginPath();
+            c.rect(15, 16, 1, 1);
+            c.rect(16, 15, 1, 1);
+            c.closePath();
+            c.fillStyle = 'white';
+            c.fill();
+            c.restore();
+            
+            c.save();
+            c.globalAlpha = 0.5;
+            c.beginPath();
+            c.rect(16 - c.measureText(index.toString()).width/2 - 2, 17, c.measureText(index.toString()).width + 4, 12);
+            c.closePath();
+            c.fillStyle = 'white';
+            c.fill();
+            c.restore();
+            
+            c.save();
+            c.font = '11px sans-serif';
+            c.fillStyle = 'black';
+            c.fillText(index.toString(), 16 - c.measureText(index.toString()).width/2, 28);
+            c.restore();
+            
+            this.element.onmousedown = function(e) { follower.onmousedown(e); };
+            
+            map.parent.appendChild(this.element);
             
             this.draw();
         }
@@ -117,24 +162,24 @@
                 
                 if(point.x < 0) {
                     // too far left
-                    this.div.style.display = 'none';
+                    this.element.style.display = 'none';
                 
                 } else if(point.y < 0) {
                     // too far up
-                    this.div.style.display = 'none';
+                    this.element.style.display = 'none';
                 
                 } else if(point.x > this.map.dimensions.x) {
                     // too far right
-                    this.div.style.display = 'none';
+                    this.element.style.display = 'none';
                 
                 } else if(point.y > this.map.dimensions.y) {
                     // too far down
-                    this.div.style.display = 'none';
+                    this.element.style.display = 'none';
         
                 } else {
-                    this.div.style.display = 'block';
-                    this.div.style.left = point.x - 16 + 'px';
-                    this.div.style.top = point.y - 16 + 'px';
+                    this.element.style.display = 'block';
+                    this.element.style.left = point.x - 16 + 'px';
+                    this.element.style.top = point.y - 16 + 'px';
                 }
             },
             
@@ -144,7 +189,7 @@
                 if (e.stopPropagation) e.stopPropagation();
 
                 var follower = this;
-                this.div.ondragstart = function(e) { return false; };
+                this.element.ondragstart = function(e) { return false; };
                 document.onmousemove = function(e) { follower.onmousemove(e) };
                 document.onmouseup = function(e) { follower.onmouseup(e) };
             },
@@ -249,7 +294,7 @@
                 
                 var c;
                 
-                for(var node = this.picture.parent.lastChild; node; node = node.previousSibling)
+                for(var node = this.picture.parent.firstChild; node; node = node.nextSibling)
                 {
                     if(node.tagName.toLowerCase() == 'canvas')
                     {
