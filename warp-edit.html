@@ -24,11 +24,20 @@
         
         #combine { left: 580px; }
         
+        #control
+        {
+        	position: absolute !important;
+        	left: 15px;
+        	top: 500px;
+        	height: 50px;
+        	font: 11px/13px monospace;
+        }
+        
         #output
         {
         	position: absolute !important;
         	left: 15px;
-        	top: 510px;
+        	top: 550px;
         	white-space: pre-wrap;
         	font: 11px/13px monospace;
         }
@@ -45,8 +54,12 @@
     <!--<div id="basemap" class="map"></div>-->
     <div id="combine" class="map"></div>
 
-    <div id="output"></div>
+    <p id="control">
+        <button onclick="startWarp(this);">start</button>
+    </p>
 
+    <div id="output"></div>
+    
     <script type="text/javascript" language="javascript1.5">
     <!--
     
@@ -182,14 +195,15 @@
         };
 
         //var zoomify = new ZoomifyProvider('http://localhost/~migurski/Canvas%20Warp/pages-12-13_img', 11946, 5670);
-        var zoomify = new ZoomifyProvider('http://s3.amazonaws.com/canvas-warp/pages-12-13_img', 11946, 5670);
+        //var zoomify = new ZoomifyProvider('http://s3.amazonaws.com/canvas-warp/pages-12-13_img', 11946, 5670);
+        var zoomify = new ZoomifyProvider('tilden-map', 5144, 1712);
 
         var picture = new mm.Map('picture', zoomify, new mm.Point(550, 450))
-        picture.setCenterZoom(new mm.Location(815, 2223), 4);
+        picture.setCenterZoom(new mm.Location(815, 2223), 3);
         picture.draw();
 
         var combine = new mm.Map('combine', new mm.MapProvider(function(c) { return 'http://tile.openstreetmap.org/'+c.zoom+'/'+c.column+'/'+c.row+'.png'; }), new mm.Point(550, 450))
-        combine.setCenterZoom(new mm.Location(37.8061189, -122.2701883), 15);
+        combine.setCenterZoom(new mm.Location(37.895989, -122.249680), 14);
         combine.draw();
         
         var canvas = document.createElement('canvas');
@@ -306,7 +320,7 @@
                 var w = this.picture.provider.bottomright.column;
                 var h = this.picture.provider.bottomright.row;
                 
-                var supertriangle = [new mm.Point(-w/2, 0), new mm.Point(w * 3/2, 0), new mm.Point(w/2, h*2)];
+                var supertriangle = [new mm.Point(-w/2 - 10000, -10000), new mm.Point(w * 3/2 + 10000, -10000), new mm.Point(w/2, h*2 + 10000)];
                 var triangles = [supertriangle];
                 
                 for(var i in markers)
@@ -471,22 +485,59 @@
         
         };
         
-        var markers = [
-          {"img": [2162, 191], "geo": [37.8115015, -122.2620666]},
-          {"img": [1815, 1326], "geo": [37.8066021, -122.2816360]},
-          {"img": [2821, 817], "geo": [37.7995492, -122.2636974]},
-          {"img": [2658, 438], "geo": [37.8041608, -122.2601998]},
-          {"img": [1439, 836], "geo": [37.8146037, -122.2786963]}
-        ];
-        
-        for(var i in markers)
+        function startWarp(button)
         {
-            var m = markers[i];
-            markers[i] = new Marker(new mm.Location(m.geo[0], m.geo[1]), new mm.Location(m.img[1], m.img[0]));
+            // the picture
+            var picWidth = picture.provider.bottomright.column;
+            var picHeight = picture.provider.bottomright.row;
+            var picAspect = picWidth / picHeight;
+            
+            // the combined map
+            var mapWidth = combine.dimensions.x - 20;
+            var mapHeight = combine.dimensions.y - 20;
+            var mapAspect = mapWidth / mapHeight;
+            
+            if(picAspect > mapAspect) {
+                // short, wide
+                var areaHeight = mapWidth / picAspect;
+                
+                var mapLeft = (combine.dimensions.x - mapWidth) / 2;
+                var mapTop = (combine.dimensions.y - areaHeight) / 2;
+                var mapRight = mapLeft + mapWidth;
+                var mapBottom = mapTop + areaHeight;
+            
+            } else {
+                // narrow, tall
+                var areaWidth = mapHeight * picAspect;
+                
+                var mapLeft = (combine.dimensions.x - areaWidth) / 2;
+                var mapTop = (combine.dimensions.y - mapHeight) / 2;
+                var mapRight = mapLeft + areaWidth;
+                var mapBottom = mapTop + mapHeight;
+            }
+            
+            var northwest = combine.pointLocation(new mm.Point(mapLeft, mapTop));
+            var southeast = combine.pointLocation(new mm.Point(mapRight, mapBottom));
+            
+            var markers = [
+                {"img": [0, 0], "geo": [northwest.lat, northwest.lon]},
+                {"img": [picWidth, 0], "geo": [northwest.lat, southeast.lon]},
+                {"img": [0, picHeight], "geo": [southeast.lat, northwest.lon]},
+                {"img": [picWidth, picHeight], "geo": [southeast.lat, southeast.lon]}
+            ];
+            
+            for(var i in markers)
+            {
+                var m = markers[i];
+                markers[i] = new Marker(new mm.Location(m.geo[0], m.geo[1]), new mm.Location(m.img[1], m.img[0]));
+            }
+            
+            var mesh = new Mesh(picture, combine, canvas, markers);
+            mesh.draw(true);
+            
+            button.disabled = true;
+            return false;
         }
-        
-        var mesh = new Mesh(picture, combine, canvas, markers);
-        mesh.draw(true);
         
     //-->
     </script>
