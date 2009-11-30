@@ -56,6 +56,7 @@
 
     <p id="control">
         <button onclick="startWarp(this);">start</button>
+        <button onclick="addMarker(this);">add</button>
     </p>
 
     <div id="output"></div>
@@ -578,8 +579,10 @@
                    'lon = ' + m3.toPrecision(8) + ' * y + ' + b3.toPrecision(8)].join('\n'));
             */
 
+            /*
             alert(['lat = x * ' + (m0/2).toPrecision(4) + ' + ' + (b0/2).toPrecision(4) + ' + y * ' + (m1/2).toPrecision(4) + ' + ' + (b1/2).toPrecision(4),
                    'lon = x * ' + (m2/2).toPrecision(4) + ' + ' + (b2/2).toPrecision(4) + ' + y * ' + (m3/2).toPrecision(4) + ' + ' + (b3/2).toPrecision(4)].join('\n'));
+            */
 
             var point2location = function(x, y)
             {
@@ -650,6 +653,18 @@
             }
             
             button.disabled = true;
+            return false;
+        }
+        
+        function addMarker(button)
+        {
+            var dim = mesh.picture.dimensions;
+            var center = mesh.picture.pointLocation(new mm.Point(dim.x/2, dim.y/2));
+            var point2location = regress(mesh.markers);
+            
+            var marker = new Marker(point2location(center.lon, center.lat), center);
+            mesh.addMarker(marker);
+            
             return false;
         }
         
