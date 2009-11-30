@@ -239,8 +239,7 @@
             
             for(var i in markers)
             {
-                var f1 = new Follower(this, picture, markers[i].img, parseInt(i) + 1);
-                var f2 = new Follower(this, basemap, markers[i].geo, parseInt(i) + 1);
+                this.addMarker(markers[i]);
             }
         }
         
@@ -252,12 +251,16 @@
             
             draw: function(updatePicture)
             {
+                if(this.markers.length < 3) {
+                    return;
+                }
+
                 if(updatePicture)
                 {
                     this.revision += 1;
                     this.canvas.getContext('2d').clearRect(0, 0, this.canvas.width, this.canvas.height);
                 }
-
+                
                 var triangles = this.makeTriangles(this.markers);
                 
                 var c;
@@ -315,8 +318,22 @@
                 }
             },
             
+            addMarker: function(marker)
+            {
+                this.markers.push(marker);
+
+                var f1 = new Follower(this, this.picture, marker.img, this.markers.length);
+                var f2 = new Follower(this, this.basemap, marker.geo, this.markers.length);
+
+                this.draw(true);
+            },
+            
             makeTriangles: function(markers)
             {
+                if(markers.length < 3) {
+                    return;
+                }
+
                 var w = this.picture.provider.bottomright.column;
                 var h = this.picture.provider.bottomright.row;
                 
@@ -473,7 +490,7 @@
                         c.lineTo(tile.triangle[0], tile.triangle[1]);
                         c.closePath();
                         c.clip();
-                        c.drawImage(this, tile.offset.x, tile.offset.y, 256, 256);
+                        c.drawImage(this, tile.offset.x, tile.offset.y, this.width, this.height);
                         c.restore();
     
                         mesh.drawTiles(tiles, revision);
@@ -484,6 +501,96 @@
             }
         
         };
+
+        function regress(markers)
+        {
+            var avgx = 0;
+            var avgy = 0;
+            var avglat = 0;
+            var avglon = 0;
+            var j = 0;
+            
+            for(var i = 0; i < markers.length; i += 1)
+            {
+                var x = markers[i].img.lon;
+                var y = markers[i].img.lat;
+                var lat = markers[i].geo.lat;
+                var lon = markers[i].geo.lon;
+                
+                avgx = ((j * avgx) + x) / (j + 1);
+                avgy = ((j * avgy) + y) / (j + 1);
+                avglat = ((j * avglat) + lat) / (j + 1);
+                avglon = ((j * avglon) + lon) / (j + 1);
+                j += 1;
+            }
+            
+            //alert([avgx, avgy, avglat, avglon]);
+            
+            var num0 = 0;
+            var den0 = 0;
+            var num1 = 0;
+            var den1 = 0;
+            var num2 = 0;
+            var den2 = 0;
+            var num3 = 0;
+            var den3 = 0;
+            
+            for(var i = 0; i < markers.length; i += 1)
+            {
+                var x = markers[i].img.lon;
+                var y = markers[i].img.lat;
+                var lat = markers[i].geo.lat;
+                var lon = markers[i].geo.lon;
+                
+                num0 += (x - avgx) * (lat - avglat);
+                den0 += (x - avgx) * (x - avgx);
+
+                num1 += (y - avgy) * (lat - avglat);
+                den1 += (y - avgy) * (y - avgy);
+
+                num2 += (x - avgx) * (lon - avglon);
+                den2 += (x - avgx) * (x - avgx);
+
+                num3 += (y - avgy) * (lon - avglon);
+                den3 += (y - avgy) * (y - avgy);
+            }
+            
+            //alert([num0, den0, num2, den2, num1, den1, num3, den3]);
+            
+            var x = 2; // I don't know why this is here, it seems like it should be 1 but 2 works =(
+            
+            var m0 = x * num0 / den0;
+            var b0 = avglat - (m0 * avgx);
+
+            var m1 = x * num1 / den1;
+            var b1 = avglat - (m1 * avgy);
+
+            var m2 = x * num2 / den2;
+            var b2 = avglon - (m2 * avgx);
+
+            var m3 = x * num3 / den3;
+            var b3 = avglon - (m3 * avgy);
+            
+            /*
+            alert(['lat = ' + m0.toPrecision(8) + ' * x + ' + b0.toPrecision(8),
+                   'lat = ' + m1.toPrecision(8) + ' * y + ' + b1.toPrecision(8),
+                   'lon = ' + m2.toPrecision(8) + ' * x + ' + b2.toPrecision(8),
+                   'lon = ' + m3.toPrecision(8) + ' * y + ' + b3.toPrecision(8)].join('\n'));
+            */
+
+            alert(['lat = x * ' + (m0/2).toPrecision(4) + ' + ' + (b0/2).toPrecision(4) + ' + y * ' + (m1/2).toPrecision(4) + ' + ' + (b1/2).toPrecision(4),
+                   'lon = x * ' + (m2/2).toPrecision(4) + ' + ' + (b2/2).toPrecision(4) + ' + y * ' + (m3/2).toPrecision(4) + ' + ' + (b3/2).toPrecision(4)].join('\n'));
+
+            var point2location = function(x, y)
+            {
+                return new mm.Location(x * m0/2 + b0/2 + y * m1/2 + b1/2,
+                                       x * m2/2 + b2/2 + y * m3/2 + b3/2);
+            };
+            
+            //alert(point2location(0, 0));
+            
+            return point2location;
+        }
         
         function startWarp(button)
         {
@@ -526,18 +633,28 @@
                 {"img": [picWidth, picHeight], "geo": [southeast.lat, southeast.lon]}
             ];
             
+            /*
+            var markers = [
+                {"img": [559, 311], "geo": [37.9242275, -122.2621254]},
+                {"img": [4903, 479], "geo": [37.8796639, -122.2217850]},
+                {"img": [1511, 1647], "geo": [37.9043195, -122.2693352]},
+                {"img": [3763, 1511], "geo": [37.8829834, -122.2458176]}
+            ];
+            */
+            
             for(var i in markers)
             {
                 var m = markers[i];
                 markers[i] = new Marker(new mm.Location(m.geo[0], m.geo[1]), new mm.Location(m.img[1], m.img[0]));
+                mesh.addMarker(markers[i]);
             }
-            
-            var mesh = new Mesh(picture, combine, canvas, markers);
-            mesh.draw(true);
             
             button.disabled = true;
             return false;
         }
+        
+        var mesh = new Mesh(picture, combine, canvas, []);
+        mesh.draw(true);
         
     //-->
     </script>
